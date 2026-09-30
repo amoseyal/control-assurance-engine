@@ -1,0 +1,9 @@
+device_id,device_name,assigned_user,device_type,operating_system,company_managed,disk_encrypted,endpoint_protection
+DEV-001,NS-LT-001,jcarter,laptop,Windows 11 Pro,true,true,true
+DEV-002,NS-LT-002,mlopez,laptop,Windows 11 Pro,true,false,true
+DEV-003,NS-LT-003,akim,laptop,Windows 11 Pro,true,true,true
+DEV-004,NS-LT-004,dthomas,laptop,Windows 11 Pro,true,true,true
+DEV-005,NS-LT-005,snguyen,laptop,Windows 11 Pro,true,false,true
+DEV-006,NS-DT-001,jparis,desktop,Windows 11 Pro,true,true,true
+DEV-007,NS-LT-006,kpatel,laptop,Windows 11 Pro,true,,true
+DEV-008,PERSONAL-LT-01,thage,laptop,macOS,false,false,false

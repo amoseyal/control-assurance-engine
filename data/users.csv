@@ -1,0 +1,14 @@
+username,first_name,last_name,email_address,department,employment_status,enabled,mfa_enabled,is_admin,admin_approved
+jcarter,James,Carter,jcarter@northstarbuildco.com,Finance,active,true,true,true,
+mlopez,Maria,Lopez,mlopez@northstarbuildco.com,Operations,active,true,false,false,false
+rsmith,Robert,Smith,rsmith@northstarbuildco.com,Estimating,active,false,false,false,false
+tgreen,Thomas,Green,tgreen@northstarbuildco.com,Estimating,active,,true,false,false
+malvarez,Melanie,Alvarez,malvarez@northstarbuildco.com,Accounting,terminated,true,true,false,false
+jparis,Jonathan,Paris,jparis@northstarbuildco.com,Finance,active,true,false,false,false
+akim,Alice,Kim,akim@northstarbuildco.com,Project Management,active,true,true,true,false
+thage,Tracy,Hage,thage@northstarbuildco.com,Project Management,active,true,,false,false
+dthomas,Daniel,Thomas,dthomas@northstarbuildco.com,Executive,active,true,true,true,true
+tvigne,Thomas,Vigne,tvigne@northstarbuildcom.com,Sales,terminated,false,false,false,false
+snguyen,Sarah,Nguyen,snguyen@northstarbuildco.com,Accounting,active,true,false,false,false
+bwilliams,Brian,Williams,bwilliams@northstarbuildco.com,Field Operations,active,false,false,false,false
+kpatel,Kavita,Patel,kpatel@northstarbuildco.com,Human Resources,active,true,true

@@ -1,0 +1,6 @@
+control_id,requirement,result,population_tested,exception_count,exception_rate,affected_entities,evidence_issue_count
+IAM-01,All active user accounts must have MFA enabled.,FAIL,8,3,37.5,"mlopez, jparis, snguyen",2
+IAM-02,Terminated users must have their accounts disabled.,FAIL,2,1,50.0,malvarez,0
+IAM-03,Administrative privileges must be limited to approved accounts.,FAIL,2,1,50.0,akim,2
+END-01,Company-managed endpoints must use disk encryption.,FAIL,6,2,33.3,"DEV-002, DEV-005",1
+END-02,Company-managed endpoints must have endpoint protection enabled.,PASS,7,0,0.0,,0
