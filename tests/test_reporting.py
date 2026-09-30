@@ -58,7 +58,21 @@ def test_build_iam_01_finding():
         requirement = 'All active user accounts must have MFA enabled.',
         assessable_population = assessable_users,
         exceptions = exceptions,
-        evidence_issues = evidence_issues
+        evidence_issues = evidence_issues,
+
+        # Include the control's NIST CSF 2.0 mapping in the finding.
+        nist_csf_function='Protect',
+        nist_csf_category='PR.AA',
+        nist_csf_subcategory='PR.AA-03',
+
+        # Include the human-readable NIST CSF 2.0 metadata
+        # along with the framework codes.
+        nist_csf_category_name=(
+            'Identity Management, Authentication, and Access Control'
+        ),
+        nist_csf_subcategory_outcome=(
+            'Users, services, and hardware are authenticated'
+        )
     )
 
     # Verify the identity and requirement of the control being reported.
@@ -86,6 +100,22 @@ def test_build_iam_01_finding():
     
     # Evidence-quality problems should also be quantified separately.
     assert finding['evidence_issue_count'] == 1
+
+    # Verify that the NIST CSF mapping is preserved
+    # in the structured control finding.
+    assert finding['nist_csf_function'] == 'Protect'
+    assert finding['nist_csf_category'] == 'PR.AA'
+    assert finding['nist_csf_subcategory'] == 'PR.AA-03'
+
+    # Verify that the human-readable NIST CSF metadata
+    # is preserved in the structured finding.
+    assert finding['nist_csf_category_name'] == (
+        'Identity Management, Authentication, and Access Control'
+    )
+
+    assert finding['nist_csf_subcategory_outcome'] == (
+        'Users, services, and hardware are authenticated'
+    )
 
 
 def test_build_end_01_finding():

@@ -12,6 +12,11 @@ def build_control_finding(
         assessable_population,
         exceptions,
         evidence_issues,
+        nist_csf_function = None,
+        nist_csf_category = None,
+        nist_csf_category_name = None,
+        nist_csf_subcategory = None,
+        nist_csf_subcategory_outcome = None,
         identifier_column = 'username'
 ):
     """
@@ -85,6 +90,16 @@ def build_control_finding(
     finding = {
         'control_id': control_id,
         'requirement': requirement,
+
+        # Preserve the control's NIST CSF 2.0 mapping
+        # in the structured finding.
+        'nist_csf_function': nist_csf_function,
+        'nist_csf_category': nist_csf_category,
+        'nist_csf_category_name': nist_csf_category_name,
+        'nist_csf_subcategory': nist_csf_subcategory,
+        'nist_csf_subcategory_outcome': nist_csf_subcategory_outcome,
+
+        # Store the assessment results.
         'result': result,
         'population_tested': population_tested,
         'exception_count': exception_count,

@@ -83,7 +83,15 @@ def main():
         requirement=iam_01_control['requirement'],
         assessable_population=iam_01_population,
         exceptions=iam_01_exceptions,
-        evidence_issues=iam_01_evidence_issues
+        evidence_issues=iam_01_evidence_issues,
+
+        # Pass the control's NIST CSF 2.0 mapping from the
+        # centralized control catalog into the finding.
+        nist_csf_function=iam_01_control['nist_csf_function'],
+        nist_csf_category=iam_01_control['nist_csf_category'],
+        nist_csf_category_name=iam_01_control['nist_csf_category_name'],
+        nist_csf_subcategory=iam_01_control['nist_csf_subcategory'],
+        nist_csf_subcategory_outcome=iam_01_control['nist_csf_subcategory_outcome']
     )
 
 
@@ -111,7 +119,15 @@ def main():
         requirement=iam_02_control['requirement'],
         assessable_population=iam_02_population,
         exceptions=iam_02_exceptions,
-        evidence_issues=iam_02_evidence_issues
+        evidence_issues=iam_02_evidence_issues,
+
+        # Pass the control's NIST CSF 2.0 mapping from the
+        # centralized control catalog into the finding.
+        nist_csf_function=iam_02_control['nist_csf_function'],
+        nist_csf_category=iam_02_control['nist_csf_category'],
+        nist_csf_category_name=iam_02_control['nist_csf_category_name'],
+        nist_csf_subcategory=iam_02_control['nist_csf_subcategory'],
+        nist_csf_subcategory_outcome=iam_02_control['nist_csf_subcategory_outcome']
     )
 
 
@@ -139,7 +155,15 @@ def main():
         requirement=iam_03_control['requirement'],
         assessable_population=iam_03_population,
         exceptions=iam_03_exceptions,
-        evidence_issues=iam_03_evidence_issues
+        evidence_issues=iam_03_evidence_issues,
+
+        # Pass the control's NIST CSF 2.0 mapping from the
+        # centralized control catalog into the finding.
+        nist_csf_function=iam_03_control['nist_csf_function'],
+        nist_csf_category=iam_03_control['nist_csf_category'],
+        nist_csf_category_name=iam_03_control['nist_csf_category_name'],
+        nist_csf_subcategory=iam_03_control['nist_csf_subcategory'],
+        nist_csf_subcategory_outcome=iam_03_control['nist_csf_subcategory_outcome']
     )
 
 
@@ -167,8 +191,16 @@ def main():
         requirement=end_01_control['requirement'],
         assessable_population=end_01_population,
         exceptions=end_01_exceptions,
-       evidence_issues=end_01_evidence_issues,
-        identifier_column='device_id'
+        evidence_issues=end_01_evidence_issues,
+        identifier_column='device_id',
+
+        # Pass the control's NIST CSF 2.0 mapping from the
+        # centralized control catalog into the finding.
+        nist_csf_function=end_01_control['nist_csf_function'],
+        nist_csf_category=end_01_control['nist_csf_category'],
+        nist_csf_category_name=end_01_control['nist_csf_category_name'],
+        nist_csf_subcategory=end_01_control['nist_csf_subcategory'],
+        nist_csf_subcategory_outcome=end_01_control['nist_csf_subcategory_outcome']
     )
 
 
@@ -192,12 +224,20 @@ def main():
     # Build the structured finding using the catalog metadata and
     # the assessment results produced by the END-02 control logic.
     end_02_finding = build_control_finding(
-       control_id=end_02_control['control_id'],
-      requirement=end_02_control['requirement'],
-      assessable_population=end_02_population,
-      exceptions=end_02_exceptions,
-      evidence_issues=end_02_evidence_issues,
-      identifier_column='device_id'
+        control_id=end_02_control['control_id'],
+        requirement=end_02_control['requirement'],
+        assessable_population=end_02_population,
+        exceptions=end_02_exceptions,
+        evidence_issues=end_02_evidence_issues,
+        identifier_column='device_id',
+
+        # Pass the control's NIST CSF 2.0 mapping from the
+        # centralized control catalog into the finding.
+        nist_csf_function=end_02_control['nist_csf_function'],
+        nist_csf_category=end_02_control['nist_csf_category'],
+        nist_csf_category_name=end_02_control['nist_csf_category_name'],
+        nist_csf_subcategory=end_02_control['nist_csf_subcategory'],
+        nist_csf_subcategory_outcome=end_02_control['nist_csf_subcategory_outcome']
     )
 
 

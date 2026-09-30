@@ -16,7 +16,18 @@ CONTROL_CATALOG = {
             'All active user accounts must have MFA enabled.'
         ),
         'evidence_source': 'users.csv',
-        'entity_label': 'Accounts'
+        'entity_label': 'Accounts',
+
+        # Map the control to the relevant NBIST CSF 2.0 coutcome.
+        'nist_csf_function': 'Protect',
+        'nist_csf_category': 'PR.AA',
+        'nist_csf_category_name': (
+            'Identity Management, Authentication, and Access Control'
+        ),
+        'nist_csf_subcategory': 'PR.AA-03',
+        'nist_csf_subcategory_outcome': (
+            'Users, services, and hardware are authenticated'
+        )
     },
 
     'IAM-02': {
@@ -26,7 +37,21 @@ CONTROL_CATALOG = {
                 'Terminated users must have their accounts disabled.'
             ),
             'evidence_source': 'users.csv',
-            'entity_label': 'Accounts'
+            'entity_label': 'Accounts',
+
+            # Map the control to the relevant NIST CSF 2.0 outcome.
+            'nist_csf_function': 'Protect',
+            'nist_csf_category': 'PR.AA',
+            'nist_csf_category_name': (
+                'Identity Management, Authentication, and Access Control'
+            ),
+            'nist_csf_subcategory': 'PR.AA-05',
+            'nist_csf_subcategory_outcome': (
+                'Access permissions, entitlements, and authorizations are '
+                'defined in a policy, managed, enforced, and reviewed, and '
+                'incorporate the principles of least privilege and '
+                'separation of duties'
+            )
         },
 
     'IAM-03': {
@@ -36,7 +61,21 @@ CONTROL_CATALOG = {
             'Administrative privileges must be limited to approved accounts.'
         ),
         'evidence_source': 'users.csv',
-        'entity_label': 'Accounts'
+        'entity_label': 'Accounts',
+
+        # Map the control to the relevant NIST CSF 2.0 outcome.
+        'nist_csf_function': 'Protect',
+        'nist_csf_category': 'PR.AA',
+        'nist_csf_category_name': (
+            'Identity Management, Authentication, and Access Control'
+        ),
+        'nist_csf_subcategory': 'PR.AA-05',
+        'nist_csf_subcategory_outcome': (
+            'Access permissions, entitlements, and authorizations are '
+            'defined in a policy, managed, enforced, and reviewed, and '
+            'incorporate the principles of least privilege and '
+            'separation of duties'
+        )
     },
 
     'END-01': {
@@ -46,7 +85,17 @@ CONTROL_CATALOG = {
             'Company-managed endpoints must use disk encryption.'
         ),
         'evidence_source': 'devices.csv',
-        'entity_label': 'Devices'
+        'entity_label': 'Devices',
+
+                # Map the control to the relevant NIST CSF 2.0 outcome.
+        'nist_csf_function': 'Protect',
+        'nist_csf_category': 'PR.DS',
+        'nist_csf_category_name': 'Data Security',
+        'nist_csf_subcategory': 'PR.DS-01',
+        'nist_csf_subcategory_outcome': (
+            'The confidentiality, integrity, and availability '
+            'of data-at-rest are protected'
+        )
     },
 
     'END-02': {
@@ -56,6 +105,16 @@ CONTROL_CATALOG = {
             'Company-managed endpoints must have endpoint protection enabled.'
         ),
         'evidence_source': 'devices.csv',
-        'entity_label': 'Devices'
+        'entity_label': 'Devices',
+
+        # Map the control to the relevant NIST CSF 2.0 outcome.
+        'nist_csf_function': 'Protect',
+        'nist_csf_category': 'PR.PS',
+        'nist_csf_category_name': 'Platform Security',
+        'nist_csf_subcategory': 'PR.PS-05',
+        'nist_csf_subcategory_outcome': (
+            'Installation and execution of unauthorized '
+            'software are prevented'
+        )
     }
 }
