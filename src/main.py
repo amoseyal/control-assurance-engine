@@ -22,6 +22,10 @@ from src.reporting import (
     format_control_finding
 )
 
+# Import the centralized control metadata catalog.
+from src.control_catalog import CONTROL_CATALOG
+
+
 # Define the location of Northstar's evidence files.
 #
 # Path() provides a clean and portable way to work with filesystem paths.
@@ -69,16 +73,17 @@ def main():
         assess_iam_01(users)
     )
 
-    # Convert the IAM-01 assessment results into a structured GRC finding.
-    #
-    # The reporting layer calculates metrics such as population tested,
-    # exception count, exception rate, and overall control result.
+    # Retrieve IAM-01 metadata from the centralized control catalog.
+    iam_01_control = CONTROL_CATALOG['IAM-01']
+
+    # Build the structured finding using the catalog metadata and
+    # the assessment results produced by the IAM-01 control logic.
     iam_01_finding = build_control_finding(
-        control_id = 'IAM-01',
-        requirement = 'All active user accounts must have MFA enabled.',
-        assessable_population = iam_01_population,
-        exceptions = iam_01_exceptions,
-        evidence_issues = iam_01_evidence_issues
+        control_id=iam_01_control['control_id'],
+        requirement=iam_01_control['requirement'],
+        assessable_population=iam_01_population,
+        exceptions=iam_01_exceptions,
+        evidence_issues=iam_01_evidence_issues
     )
 
 
@@ -96,17 +101,17 @@ def main():
         assess_iam_02(users)
     )
 
-    # Convert the IAM-02 assessment results into a structured GRC finding.
-    #
-    # We can reuse build_control_finding() because the reporting
-    # function is control-agnostic. It summarizes whatever assessment
-    # results are provided to it.
+    # Retrieve IAM-02 metadata from the centralized control catalog.
+    iam_02_control = CONTROL_CATALOG['IAM-02']
+
+    # Build the structured finding using the catalog metadata and
+    # the assessment results produced by the IAM-02 control logic.
     iam_02_finding = build_control_finding(
-        control_id = 'IAM-02',
-        requirement = 'Terminated users must have their accounts disabled.',
-        assessable_population = iam_02_population,
-        exceptions = iam_02_exceptions,
-        evidence_issues = iam_02_evidence_issues
+        control_id=iam_02_control['control_id'],
+        requirement=iam_02_control['requirement'],
+        assessable_population=iam_02_population,
+        exceptions=iam_02_exceptions,
+        evidence_issues=iam_02_evidence_issues
     )
 
 
@@ -124,13 +129,17 @@ def main():
         assess_iam_03(users)
     )
 
-    # Convert the IAM-03 assessment results into a structured GRC finding.
+    # Retrieve IAM-03 metadata from the centralized control catalog.
+    iam_03_control = CONTROL_CATALOG['IAM-03']
+
+    # Build the structured finding using the catalog metadata and
+    # the assessment results produced by the IAM-03 control logic.
     iam_03_finding = build_control_finding(
-        control_id = 'IAM-03',
-        requirement = 'Administrative privileges must be limited to approved accounts.',
-        assessable_population = iam_03_population,
-        exceptions = iam_03_exceptions,
-        evidence_issues = iam_03_evidence_issues
+        control_id=iam_03_control['control_id'],
+        requirement=iam_03_control['requirement'],
+        assessable_population=iam_03_population,
+        exceptions=iam_03_exceptions,
+        evidence_issues=iam_03_evidence_issues
     )
 
 
@@ -148,17 +157,18 @@ def main():
         assess_end_01(devices)
     )
 
-    # Convert the END-01 assessment results into a structured GRC finding.
-    #
-    # The same reporting function used for IAM controls can also summarize
-    # endpoint controls because it operates on generic assessment results.
+    # Retrieve END-01 metadata from the centralized control catalog.
+    end_01_control = CONTROL_CATALOG['END-01']
+
+    # Build the structured finding using the catalog metadata and
+    # the assessment results produced by the END-01 control logic.
     end_01_finding = build_control_finding(
-        control_id = 'END-01',
-        requirement = 'Company-managed endpoints must use disk encryption.',
-        assessable_population = end_01_population,
-        exceptions = end_01_exceptions,
-        evidence_issues = end_01_evidence_issues,
-        identifier_column = 'device_id'
+        control_id=end_01_control['control_id'],
+        requirement=end_01_control['requirement'],
+        assessable_population=end_01_population,
+        exceptions=end_01_exceptions,
+       evidence_issues=end_01_evidence_issues,
+        identifier_column='device_id'
     )
 
 
@@ -176,19 +186,18 @@ def main():
         assess_end_02(devices)
     )
 
-    # Convert the END-02 assessment results into a structured GRC finding.
-    #
-    # Because this control evaluates endpoint devices, device_id is used
-    # as the identifier for affected entities.
+    # Retrieve END-02 metadata from the centralized control catalog.
+    end_02_control = CONTROL_CATALOG['END-02']
+
+    # Build the structured finding using the catalog metadata and
+    # the assessment results produced by the END-02 control logic.
     end_02_finding = build_control_finding(
-        control_id='END-02',
-        requirement=(
-            'Company-managed endpoints must have endpoint protection enabled.'
-        ),
-        assessable_population=end_02_population,
-        exceptions=end_02_exceptions,
-        evidence_issues=end_02_evidence_issues,
-        identifier_column='device_id'
+       control_id=end_02_control['control_id'],
+      requirement=end_02_control['requirement'],
+      assessable_population=end_02_population,
+      exceptions=end_02_exceptions,
+      evidence_issues=end_02_evidence_issues,
+      identifier_column='device_id'
     )
 
 
@@ -226,8 +235,8 @@ def main():
     # ------------------------------------------------------------------
 
     # Display confirmed IAM-01 control exceptions.
-    print('\nIAM-01 Control Exceptions')
-    print('-------------------------')
+    print('\n## IAM-01 Control Exceptions')
+    print('---------------------------')
 
     if iam_01_exceptions.empty:
         print('No control exceptions identified.')
@@ -238,8 +247,8 @@ def main():
     #
     # This prevents incomplete evidence from being incorrectly
     # reported as a confirmed control failure.
-    print('\nIAM-01 Evidence Issues')
-    print('----------------------')
+    print('\n## IAM-01 Evidence Issues')
+    print('------------------------')
 
     if iam_01_evidence_issues.empty:
         print('No evidence issues identified.')
@@ -247,14 +256,14 @@ def main():
         print(iam_01_evidence_issues.to_string(index = False))
 
     # Display the summarized IAM-01 control finding.
-    print('\nIAM-01 Control Finding')
-    print('----------------------')
+    print('\n## IAM-01 Control Finding')
+    print('------------------------')
 
     # Format and display the structured IAM-01 finding.
     print(
         format_control_finding(
             iam_01_finding,
-            entity_label='Accounts'
+            iam_01_control['entity_label']
         )
     )
 
@@ -265,8 +274,8 @@ def main():
     # ------------------------------------------------------------------
 
     # Display confirmed IAM-02 control exceptions.
-    print('\nIAM-02 Control Exceptions')
-    print('-------------------------')
+    print('\n## IAM-02 Control Exceptions')
+    print('----------------------------')
 
     if iam_02_exceptions.empty:
         print('No control exceptions identified.')
@@ -274,8 +283,8 @@ def main():
         print(iam_02_exceptions.to_string(index = False))
 
     # Display IAM-02 evidence-quality issues separately.
-    print('\nIAM-02 Evidence Issues')
-    print('----------------------')
+    print('\n## IAM-02 Evidence Issues')
+    print('-------------------------')
 
     if iam_02_evidence_issues.empty:
         print('No evidence issues identified.')
@@ -283,14 +292,14 @@ def main():
         print(iam_02_evidence_issues.to_string(index = False))
 
     # Display the summarized IAM-02 control finding.
-    print('\nIAM-02 Control Finding')
-    print('----------------------')
+    print('\n## IAM-02 Control Finding')
+    print('-------------------------')
 
     # Format and display the structured IAM-02 finding.
     print(
         format_control_finding(
             iam_02_finding,
-            entity_label='Accounts'
+            iam_02_control['entity_label']
         )
     )
 
@@ -301,8 +310,8 @@ def main():
     # ------------------------------------------------------------------
 
     # Display confirmed IAM-03 control exceptions.
-    print('\nIAM-03 Control Exceptions')
-    print('-------------------------')
+    print('\n## IAM-03 Control Exceptions')
+    print('----------------------------')
 
     if iam_03_exceptions.empty:
         print('No control exceptions identified.')
@@ -310,8 +319,8 @@ def main():
         print(iam_03_exceptions.to_string(index = False))
 
     # Display IAM-03 evidence-quality issues separately.
-    print('\nIAM-03 Evidence Issues')
-    print('----------------------')
+    print('\n## IAM-03 Evidence Issues')
+    print('-------------------------')
 
     if iam_03_evidence_issues.empty:
         print('No evidence issues identified.')
@@ -319,14 +328,14 @@ def main():
         print(iam_03_evidence_issues.to_string(index = False))
 
     # Display the summarized IAM-03 control finding.
-    print('\nIAM-03 Control Finding')
-    print('----------------------')
+    print('\n## IAM-03 Control Finding')
+    print('-------------------------')
 
     # Format and display the structured IAM-03 finding.
     print(
         format_control_finding(
             iam_03_finding,
-            entity_label='Accounts'
+            iam_03_control['entity_label']
         )
     )
 
@@ -340,24 +349,24 @@ def main():
     #
     # These are useful during development because they let us inspect
     # exactly which endpoint records produced each result.
-    print('\nEND-01 Control Exceptions')
-    print('-------------------------')
+    print('\n## END-01 Control Exceptions')
+    print('----------------------------')
     print(end_01_exceptions)
 
-    print('\nEND-01 Control Evidence Issues')
-    print('------------------------------')
+    print('\n## END-01 Control Evidence Issues')
+    print('---------------------------------')
     print(end_01_evidence_issues)
 
     # Display the structured END-01 finding in a readable format
     # consistent with the IAM control findings.
-    print('\nEND-01 Control Finding')
-    print('----------------------')
+    print('\n## END-01 Control Finding')
+    print('-------------------------')
     
     # Format and display the structured END-01 finding.
     print(
         format_control_finding(
-        end_01_finding,
-            entity_label='Devices'
+            end_01_finding,
+            end_01_control['entity_label']
         )
     )
 
@@ -368,8 +377,8 @@ def main():
     # ------------------------------------------------------------------
 
     # Display confirmed END-02 control exceptions.
-    print('\nEND-02 Control Exceptions')
-    print('-------------------------')
+    print('\n## END-02 Control Exceptions')
+    print('----------------------------')
 
     if end_02_exceptions.empty:
         print('No control exceptions identified.')
@@ -378,8 +387,8 @@ def main():
 
     # Display END-02 evidence-quality issues separately from
     # confirmed control exceptions.
-    print('\nEND-02 Evidence Issues')
-    print('----------------------')
+    print('\n## END-02 Evidence Issues')
+    print('-------------------------')
 
     if end_02_evidence_issues.empty:
         print('No evidence issues identified.')
@@ -387,14 +396,14 @@ def main():
         print(end_02_evidence_issues)
 
     # Display the structured END-02 finding.
-    print('\nEND-02 Control Finding')
-    print('----------------------')
+    print('\n## END-02 Control Finding')
+    print('-------------------------')
 
     # Format and display the structured END-02 finding.
     print(
         format_control_finding(
             end_02_finding,
-            entity_label='Devices'
+            end_02_control['entity_label']
         )
     )
 
