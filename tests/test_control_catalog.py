@@ -392,3 +392,48 @@ def test_tpr_01_control_catalog_entry():
     # prescribed by NIST CSF 2.0.
     assert control['likelihood'] == 3
     assert control['impact'] == 4
+
+
+def test_tpr_02_control_catalog_entry():
+    """
+    Test that TPR-02 contains the required control metadata,
+    NIST CSF 2.0 mapping, and baseline risk ratings.
+    """
+
+    # Retrieve the TPR-02 control definition from the
+    # centralized control catalog.
+    control = CONTROL_CATALOG['TPR-02']
+
+    # Verify the core control metadata.
+    assert control['control_id'] == 'TPR-02'
+    assert control['domain'] == 'Third-Party Risk'
+    assert control['requirement'] == (
+        'Third-party vendors with privileged access must use MFA.'
+    )
+    assert control['evidence_source'] == 'vendors.csv'
+    assert control['entity_label'] == 'Vendors'
+
+    # Verify the NIST CSF 2.0 mapping.
+    #
+    # TPR-02 is an access-control requirement, so it maps to
+    # the Protect function and the Identity Management,
+    # Authentication, and Access Control category.
+    assert control['nist_csf_function'] == 'Protect'
+    assert control['nist_csf_category'] == 'PR.AA'
+    assert control['nist_csf_category_name'] == (
+        'Identity Management, Authentication, and Access Control'
+    )
+    assert control['nist_csf_subcategory'] == 'PR.AA-03'
+    assert control['nist_csf_subcategory_outcome'] == (
+        'Users, services, and hardware are authenticated'
+    )
+
+    # Verify Northstar's baseline risk assumptions.
+    #
+    # Privileged third-party access can provide elevated access
+    # to company systems, making an authentication failure
+    # potentially significant.
+    assert control['likelihood'] == 3
+    assert control['impact'] == 5
+
+

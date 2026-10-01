@@ -1,8 +1,8 @@
-vendor_id,vendor_name,service_type,critical_vendor,security_review_completed,review_date
-VND-001,Apex IT Services,Managed Service Provider,true,true,2026-06-15
-VND-002,BuildFlow,Construction SaaS,true,true,2026-04-10
-VND-003,LedgerCloud,Accounting SaaS,true,false,
-VND-004,SecureStore,Cloud Backup,true,,2026-03-22
-VND-005,OfficeSupply Direct,Office Supplies,false,false,
-VND-006,SiteTrack,Project Management SaaS,true,true,2026-01-18
-VND-007,PrintWorks,Printing Services,false,,
+vendor_id,vendor_name,service_type,critical_vendor,security_review_completed,review_date,privileged_access,mfa_enabled
+VND-001,Apex IT Services,Managed Service Provider,true,true,2026-06-15,true,true
+VND-002,BuildFlow,Construction SaaS,true,true,2026-04-10,true,false
+VND-003,LedgerCloud,Accounting SaaS,true,false,,true,true
+VND-004,SecureStore,Cloud Backup,true,,2026-03-22,true,
+VND-005,OfficeSupply Direct,Office Supplies,false,false,,false,false
+VND-006,SiteTrack,Project Management SaaS,true,true,2026-01-18,false,
+VND-007,PrintWorks,Printing Services,false,,,false,

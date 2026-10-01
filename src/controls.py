@@ -342,7 +342,7 @@ def assess_end_02(devices):
 
 
 # ------------------------------------------------------------------
-# TPR 01 CONTROL ASSESSMENT
+# THIRD-PARTY RISK (TPR) CONTROLS
 # ------------------------------------------------------------------
 
 def assess_tpr_01(vendors):
@@ -396,3 +396,57 @@ def assess_tpr_01(vendors):
     ]
 
     return exceptions, evidence_issues, assessable_population
+
+
+def assess_tpr_02(vendors):
+    """
+    Assess third-party vendors with privileged access for MFA.
+
+    Args:
+        vendors:
+            DataFrame containing third-party vendor evidence.
+
+    Returns:
+        tuple:
+            Three DataFrames containing:
+            1. confirmed control exceptions
+            2. evidence-quality issues
+            3. the assessable control population
+    """
+
+    # Identify records with missing evidence required to
+    # determine TPR-02 scope or compliance.
+    #
+    # A missing privileged_access value prevents us from
+    # determining whether the vendor belongs in scope.
+    #
+    # A privileged vendor with missing mfa_enabled evidence
+    # cannot yet be assessed for compliance.
+    evidence_issues = vendors[
+        vendors['privileged_access'].isna()
+        | (
+            (vendors['privileged_access'] == True)
+            & vendors['mfa_enabled'].isna()
+        )
+    ]
+
+    # Build the population that can actually be assessed.
+    #
+    # TPR-02 applies only to vendors with privileged access,
+    # and their MFA status must be known.
+    assessable_population = vendors[
+        (vendors['privileged_access'] == True)
+        & vendors['mfa_enabled'].notna()
+    ]
+
+    # Identify confirmed control exceptions.
+    #
+    # A privileged vendor is an exception when the available
+    # evidence confirms that MFA is not enabled.
+    exceptions = assessable_population[
+        assessable_population['mfa_enabled'] == False
+    ]
+
+    return exceptions, evidence_issues, assessable_population
+
+

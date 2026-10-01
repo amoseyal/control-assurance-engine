@@ -190,5 +190,47 @@ CONTROL_CATALOG = {
         # prescribed by NIST CSF 2.0.
         'likelihood': 3,
         'impact': 4
+    },
+
+    'TPR-02': {
+    # Unique identifier used throughout the assessment engine.
+    'control_id': 'TPR-02',
+
+    # Control domain used to group related security requirements.
+    'domain': 'Third-Party Risk',
+
+    # Northstar's internal control requirement.
+    'requirement': (
+        'Third-party vendors with privileged access must use MFA.'
+    ),
+
+    # Evidence source used to evaluate this control.
+    'evidence_source': 'vendors.csv',
+
+    # Human-readable label used when reporting affected entities.
+    'entity_label': 'Vendors',
+
+    # NIST Cybersecurity Framework 2.0 mapping.
+    #
+    # Although TPR-02 operates within Northstar's third-party
+    # risk domain, its underlying security objective is
+    # authentication of privileged access.
+    'nist_csf_function': 'Protect',
+    'nist_csf_category': 'PR.AA',
+    'nist_csf_category_name': (
+        'Identity Management, Authentication, and Access Control'
+    ),
+    'nist_csf_subcategory': 'PR.AA-03',
+    'nist_csf_subcategory_outcome': (
+        'Users, services, and hardware are authenticated'
+    ),
+
+    # Baseline risk assumptions for Northstar.
+    #
+    # Likelihood and impact represent the inherent significance
+    # of a confirmed TPR-02 failure. Active finding severity is
+    # assigned later only when the control actually fails.
+    'likelihood': 3,
+    'impact': 5
     }
 }

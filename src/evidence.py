@@ -248,7 +248,9 @@ REQUIRED_VENDOR_COLUMNS = {
     'service_type',
     'critical_vendor',
     'security_review_completed',
-    'review_date'
+    'review_date',
+    'privileged_access',
+    'mfa_enabled'
 }
 
 
@@ -294,7 +296,9 @@ def load_vendor_evidence(filepath):
     # control assessment will handle missing evidence separately.
     boolean_columns = [
         'critical_vendor',
-        'security_review_completed'
+        'security_review_completed',
+        'privileged_access',
+        'mfa_enabled'
     ]
 
     # Validate each Boolean vendor-evidence field.

@@ -15,7 +15,8 @@ from src.controls import (
     assess_iam_03,
     assess_end_01,
     assess_end_02,
-    assess_tpr_01
+    assess_tpr_01,
+    assess_tpr_02
 )
 
 # Import the reporting function that converts assessment results
@@ -324,6 +325,44 @@ def main():
 
 
 
+    # ------------------------------------------------------------------
+    # TPR-02 ASSESSMENT
+    # ------------------------------------------------------------------
+
+    # Assess TPR-02:
+    # Third-party vendors with privileged access must use MFA.
+    #
+    # The control evaluates vendors with privileged access and
+    # determines whether MFA is enabled for that access.
+    tpr_02_exceptions, tpr_02_evidence_issues, tpr_02_population = (
+        assess_tpr_02(vendors)
+    )
+
+    # Retrieve TPR-02 metadata from the centralized control catalog.
+    tpr_02_control = CONTROL_CATALOG['TPR-02']
+
+    # Build the structured finding using the catalog metadata and
+    # the assessment results produced by the TPR-02 control logic.
+    tpr_02_finding = build_control_finding(
+        control_id=tpr_02_control['control_id'],
+        requirement=tpr_02_control['requirement'],
+        assessable_population=tpr_02_population,
+        exceptions=tpr_02_exceptions,
+        evidence_issues=tpr_02_evidence_issues,
+        identifier_column='vendor_id',
+        nist_csf_function=tpr_02_control['nist_csf_function'],
+        nist_csf_category=tpr_02_control['nist_csf_category'],
+        nist_csf_category_name=tpr_02_control['nist_csf_category_name'],
+        nist_csf_subcategory=tpr_02_control['nist_csf_subcategory'],
+        nist_csf_subcategory_outcome=tpr_02_control[
+            'nist_csf_subcategory_outcome'
+        ],
+        likelihood=tpr_02_control['likelihood'],
+        impact=tpr_02_control['impact']
+    )
+
+
+
     # ============================================================
     # CONSOLIDATED FINDINGS EXPORT
     # ============================================================
@@ -338,7 +377,8 @@ def main():
         iam_03_finding,
         end_01_finding,
         end_02_finding,
-        tpr_01_finding
+        tpr_01_finding,
+        tpr_02_finding
     ]
 
     # Convert the structured findings into a DataFrame suitable
@@ -568,6 +608,47 @@ def main():
         format_control_finding(
             tpr_01_finding,
             tpr_01_control['entity_label']
+        )
+    )
+
+
+
+        # ------------------------------------------------------------------
+    # TPR-02 OUTPUT
+    # ------------------------------------------------------------------
+
+    # Display confirmed TPR-02 control exceptions.
+    print('\n## TPR-02 Control Exceptions')
+    print('----------------------------')
+
+    if tpr_02_exceptions.empty:
+        print('No control exceptions identified.')
+    else:
+        print(tpr_02_exceptions.to_string(index=False))
+
+    # Display TPR-02 evidence-quality issues separately from
+    # confirmed control exceptions.
+    #
+    # A missing MFA status for a privileged vendor does not
+    # automatically establish that the vendor failed the control.
+    print('\n## TPR-02 Evidence Issues')
+    print('-------------------------')
+
+    if tpr_02_evidence_issues.empty:
+        print('No evidence issues identified.')
+    else:
+        print(tpr_02_evidence_issues.to_string(index=False))
+
+    # Display the structured TPR-02 finding.
+    print('\n## TPR-02 Control Finding')
+    print('-------------------------')
+
+    # Format and display the structured TPR-02 finding using
+    # the vendor entity label defined in the control catalog.
+    print(
+        format_control_finding(
+            tpr_02_finding,
+            tpr_02_control['entity_label']
         )
     )
 

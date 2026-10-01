@@ -326,7 +326,9 @@ def test_load_vendor_evidence():
         'service_type',
         'critical_vendor',
         'security_review_completed',
-        'review_date'
+        'review_date',
+        'privileged_access',
+        'mfa_enabled'
     ]
 
     # Verify a representative vendor record so that the test
@@ -402,9 +404,10 @@ def test_load_vendor_evidence_rejects_invalid_boolean_values(tmp_path):
     # so that this test isolates the critical_vendor field.
     test_file.write_text(
         'vendor_id,vendor_name,service_type,critical_vendor,'
-        'security_review_completed,review_date\n'
+        'security_review_completed,review_date,'
+        'privileged_access,mfa_enabled\n'
         'VND-001,Apex IT Services,Managed Service Provider,'
-        'yes,true,2026-06-15\n'
+        'yes,true,2026-06-15,true,true\n'
     )
 
     # The loader should reject the malformed vendor evidence
@@ -438,9 +441,10 @@ def test_load_vendor_evidence_rejects_invalid_security_review_value(tmp_path):
     # or remain blank when the evidence is missing.
     test_file.write_text(
         'vendor_id,vendor_name,service_type,critical_vendor,'
-        'security_review_completed,review_date\n'
+        'security_review_completed,review_date,'
+        'privileged_access,mfa_enabled\n'
         'VND-001,Apex IT Services,Managed Service Provider,'
-        'true,completed,2026-06-15\n'
+        'true,completed,2026-06-15,true,true\n'
     )
 
     # The loader should reject the malformed value and identify
@@ -451,5 +455,64 @@ def test_load_vendor_evidence_rejects_invalid_security_review_value(tmp_path):
     ):
         load_vendor_evidence(test_file)
 
+
+def test_load_vendor_evidence_rejects_invalid_privileged_access_value(tmp_path):
+    """
+    Test that vendor evidence is rejected when privileged_access
+    contains an unsupported value.
+    """
+
+    # Create a temporary CSV containing all required vendor columns.
+    #
+    # privileged_access='yes' is intentionally invalid.
+    # All other Boolean fields contain valid values so that this
+    # test specifically exercises privileged_access validation.
+    test_file = tmp_path / 'vendors_invalid_privileged_access.csv'
+
+    test_file.write_text(
+        'vendor_id,vendor_name,service_type,critical_vendor,'
+        'security_review_completed,review_date,'
+        'privileged_access,mfa_enabled\n'
+        'VND-001,Apex IT Services,Managed Service Provider,'
+        'true,true,2026-06-15,yes,true\n'
+    )
+
+    # The loader should reject the malformed value and identify
+    # privileged_access as the field responsible for the failure.
+    with pytest.raises(
+        ValueError,
+        match='privileged_access'
+    ):
+        load_vendor_evidence(test_file)
+
+
+def test_load_vendor_evidence_rejects_invalid_mfa_enabled_value(tmp_path):
+    """
+    Test that vendor evidence is rejected when mfa_enabled
+    contains an unsupported value.
+    """
+
+    # Create a temporary CSV containing all required vendor columns.
+    #
+    # mfa_enabled='enabled' is intentionally invalid.
+    # All other Boolean fields contain valid values so that this
+    # test specifically exercises mfa_enabled validation.
+    test_file = tmp_path / 'vendors_invalid_mfa_enabled.csv'
+
+    test_file.write_text(
+        'vendor_id,vendor_name,service_type,critical_vendor,'
+        'security_review_completed,review_date,'
+        'privileged_access,mfa_enabled\n'
+        'VND-001,Apex IT Services,Managed Service Provider,'
+        'true,true,2026-06-15,true,enabled\n'
+    )
+
+    # The loader should reject the malformed value and identify
+    # mfa_enabled as the field responsible for the failure.
+    with pytest.raises(
+        ValueError,
+        match='mfa_enabled'
+    ):
+        load_vendor_evidence(test_file)
 
 

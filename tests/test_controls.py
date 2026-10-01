@@ -7,7 +7,8 @@ from src.controls import (
     assess_iam_03,
     assess_end_01,
     assess_end_02,
-    assess_tpr_01
+    assess_tpr_01,
+    assess_tpr_02
 )
 
 
@@ -875,3 +876,145 @@ def test_tpr_01_identifies_missing_critical_vendor_status():
     # Only VND-001 has sufficient evidence to determine both
     # control scope and compliance.
     assert set(assessable_population['vendor_id']) == {'VND-001'}
+
+
+
+# ------------------------------------------------------------------
+# TPR 02 CONTROL TESTING
+# ------------------------------------------------------------------
+
+def test_tpr_02_flags_privileged_vendors_without_mfa():
+    """
+    Test that vendors with privileged access are flagged when
+    MFA is explicitly disabled.
+    """
+
+    # Create representative vendor evidence.
+    #
+    # VND-001 has privileged access and MFA enabled, so it is compliant.
+    # VND-002 has privileged access and MFA disabled, so it is an exception.
+    # VND-003 does not have privileged access, so it is outside TPR-02 scope.
+    vendors = pd.DataFrame([
+        {
+            'vendor_id': 'VND-001',
+            'privileged_access': True,
+            'mfa_enabled': True
+        },
+        {
+            'vendor_id': 'VND-002',
+            'privileged_access': True,
+            'mfa_enabled': False
+        },
+        {
+            'vendor_id': 'VND-003',
+            'privileged_access': False,
+            'mfa_enabled': False
+        }
+    ])
+
+    # Assess the vendor evidence against TPR-02.
+    exceptions, evidence_issues, assessable_population = assess_tpr_02(vendors)
+
+    # VND-002 is the only confirmed control exception.
+    assert list(exceptions['vendor_id']) == ['VND-002']
+
+    # All evidence needed for the in-scope vendors is present.
+    assert evidence_issues.empty
+
+    # Only privileged vendors belong in the assessable population.
+    assert list(assessable_population['vendor_id']) == [
+        'VND-001',
+        'VND-002'
+    ]
+
+
+def test_tpr_02_identifies_missing_mfa_status():
+    """
+    Test that a privileged vendor with missing MFA evidence
+    is identified as an evidence-quality issue.
+    """
+
+    # The vendor is known to have privileged access, but its
+    # MFA status is unknown. Therefore, we cannot determine
+    # whether the vendor complies with TPR-02.
+    vendors = pd.DataFrame([
+        {
+            'vendor_id': 'VND-001',
+            'privileged_access': True,
+            'mfa_enabled': None
+        }
+    ])
+
+    # Assess the vendor evidence against TPR-02.
+    exceptions, evidence_issues, assessable_population = assess_tpr_02(vendors)
+
+    # Missing MFA evidence is not a confirmed control failure.
+    assert exceptions.empty
+
+    # The vendor should be reported as an evidence-quality issue.
+    assert list(evidence_issues['vendor_id']) == ['VND-001']
+
+    # Without MFA evidence, the vendor cannot enter the
+    # assessable population.
+    assert assessable_population.empty
+
+
+def test_tpr_02_ignores_missing_mfa_for_nonprivileged_vendors():
+    """
+    Test that missing MFA evidence is not an evidence issue
+    when the vendor does not have privileged access.
+    """
+
+    # TPR-02 applies only to vendors with privileged access.
+    #
+    # Because this vendor is explicitly non-privileged, its
+    # missing MFA status does not prevent us from determining
+    # the control's applicability.
+    vendors = pd.DataFrame([
+        {
+            'vendor_id': 'VND-001',
+            'privileged_access': False,
+            'mfa_enabled': None
+        }
+    ])
+
+    # Assess the vendor evidence against TPR-02.
+    exceptions, evidence_issues, assessable_population = assess_tpr_02(vendors)
+
+    # The vendor is outside the control's scope.
+    assert exceptions.empty
+    assert evidence_issues.empty
+    assert assessable_population.empty
+
+
+def test_tpr_02_identifies_missing_privileged_access_status():
+    """
+    Test that missing privileged-access evidence is identified
+    as an evidence-quality issue.
+    """
+
+    # Without privileged_access evidence, we cannot determine
+    # whether the vendor belongs in TPR-02's scope.
+    #
+    # Even though MFA is enabled, that does not resolve the
+    # missing scope evidence.
+    vendors = pd.DataFrame([
+        {
+            'vendor_id': 'VND-001',
+            'privileged_access': None,
+            'mfa_enabled': True
+        }
+    ])
+
+    # Assess the vendor evidence against TPR-02.
+    exceptions, evidence_issues, assessable_population = assess_tpr_02(vendors)
+
+    # The missing scope evidence is not a confirmed failure.
+    assert exceptions.empty
+
+    # The vendor should be identified as an evidence-quality issue.
+    assert list(evidence_issues['vendor_id']) == ['VND-001']
+
+    # We cannot include the vendor in the assessable population
+    # until its privileged-access status is known.
+    assert assessable_population.empty
