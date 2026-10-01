@@ -141,5 +141,54 @@ CONTROL_CATALOG = {
         # of this control in the Northstar BuildCo scenario.
         'likelihood': 4,
         'impact': 4
+    },
+
+    'TPR-01': {
+        # Unique identifier used throughout the assessment engine.
+        'control_id': 'TPR-01',
+
+        # Control domain used to group related controls.
+        'domain': 'Third-Party Risk',
+
+        # Plain-language statement describing the control
+        # requirement being assessed.
+        'requirement': (
+            'Critical third-party vendors must have a documented '
+            'security review.'
+        ),
+
+        # Evidence file used to evaluate this control.
+        'evidence_source': 'vendors.csv',
+
+        # Human-readable label used when reporting affected
+        # entities for this control.
+        'entity_label': 'Vendors',
+
+        # NIST Cybersecurity Framework 2.0 mapping.
+        #
+        # GV.SC addresses Cybersecurity Supply Chain Risk
+        # Management. GV.SC-07 covers assessing and monitoring
+        # risks posed by suppliers and other third parties
+        # throughout the relationship.
+        'nist_csf_function': 'Govern',
+        'nist_csf_category': 'GV.SC',
+        'nist_csf_category_name': (
+            'Cybersecurity Supply Chain Risk Management'
+        ),
+        'nist_csf_subcategory': 'GV.SC-07',
+        'nist_csf_subcategory_outcome': (
+            'The risks posed by a supplier, their products and services, '
+            'and other third parties are understood, recorded, prioritized, '
+            'assessed, responded to, and monitored over the course of the '
+            'relationship'
+        ),
+
+        # Define Northstar BuildCo's baseline risk assumptions
+        # for a failed TPR-01 control assessment.
+        #
+        # These ratings are scenario-specific and are not
+        # prescribed by NIST CSF 2.0.
+        'likelihood': 3,
+        'impact': 4
     }
 }

@@ -6,7 +6,8 @@ from src.controls import (
     assess_iam_02,
     assess_iam_03,
     assess_end_01,
-    assess_end_02
+    assess_end_02,
+    assess_tpr_01
 )
 
 
@@ -689,3 +690,188 @@ def test_end_02_ignores_missing_protection_for_unmanaged_devices():
     assert assessable_population.empty
 
 
+
+# ------------------------------------------------------------------
+# TPR 01 CONTROL TESTING
+# ------------------------------------------------------------------
+
+def test_tpr_01_flags_critical_vendors_without_security_review():
+    """
+    Test that TPR-01 identifies critical third-party vendors
+    that do not have a documented security review.
+    """
+
+    # Create a small vendor population containing both critical
+    # and noncritical third-party vendors.
+    #
+    # VND-001 is critical and has completed a security review.
+    # VND-002 is critical but has not completed a security review.
+    # VND-003 is noncritical and therefore outside TPR-01's scope.
+    vendors = pd.DataFrame([
+        {
+            'vendor_id': 'VND-001',
+            'critical_vendor': True,
+            'security_review_completed': True
+        },
+        {
+            'vendor_id': 'VND-002',
+            'critical_vendor': True,
+            'security_review_completed': False
+        },
+        {
+            'vendor_id': 'VND-003',
+            'critical_vendor': False,
+            'security_review_completed': False
+        }
+    ])
+
+    # Run the TPR-01 assessment.
+    #
+    # TPR-01 follows the same assessment pattern as the IAM
+    # and endpoint controls:
+    # 1. confirmed control exceptions
+    # 2. evidence-quality issues
+    # 3. assessable control population
+    exceptions, evidence_issues, assessable_population = assess_tpr_01(
+        vendors
+    )
+
+    # VND-002 is critical but lacks a completed security review,
+    # making it a confirmed TPR-01 control exception.
+    assert set(exceptions['vendor_id']) == {'VND-002'}
+
+    # Every record contains sufficient evidence to determine
+    # whether TPR-01 applies and whether the vendor complies.
+    assert evidence_issues.empty
+
+    # Only critical vendors with known security-review status
+    # belong in TPR-01's assessable population.
+    assert set(assessable_population['vendor_id']) == {
+        'VND-001',
+        'VND-002'
+    }
+
+
+def test_tpr_01_identifies_missing_security_review_status():
+    """
+    Test that TPR-01 identifies missing security-review evidence
+    for vendors known to be critical.
+    """
+
+    # Create two critical third-party vendor records.
+    #
+    # VND-001 has a completed security review.
+    # VND-004 is critical, but its security-review status
+    # is unknown.
+    vendors = pd.DataFrame([
+        {
+            'vendor_id': 'VND-001',
+            'critical_vendor': True,
+            'security_review_completed': True
+        },
+        {
+            'vendor_id': 'VND-004',
+            'critical_vendor': True,
+            'security_review_completed': None
+        }
+    ])
+
+    # Run the TPR-01 assessment.
+    exceptions, evidence_issues, assessable_population = assess_tpr_01(
+        vendors
+    )
+
+    # Neither vendor is a confirmed control exception.
+    #
+    # VND-001 is compliant, while VND-004 cannot be evaluated
+    # because its security-review evidence is missing.
+    assert exceptions.empty
+
+    # VND-004 should be classified as an evidence-quality issue,
+    # not as a confirmed control failure.
+    assert set(evidence_issues['vendor_id']) == {'VND-004'}
+
+    # Only VND-001 has sufficient evidence to be included in
+    # TPR-01's assessable population.
+    assert set(assessable_population['vendor_id']) == {'VND-001'}
+
+
+def test_tpr_01_ignores_missing_review_for_noncritical_vendors():
+    """
+    Test that TPR-01 does not report missing security-review
+    evidence for vendors known to be outside the control's scope.
+    """
+
+    # This vendor is not classified as critical, so TPR-01
+    # does not apply.
+    #
+    # Even though security_review_completed is missing, we
+    # already have sufficient evidence to determine that the
+    # vendor is outside the critical-vendor population.
+    vendors = pd.DataFrame([
+        {
+            'vendor_id': 'VND-007',
+            'critical_vendor': False,
+            'security_review_completed': None
+        }
+    ])
+
+    # Run the TPR-01 assessment.
+    exceptions, evidence_issues, assessable_population = assess_tpr_01(
+        vendors
+    )
+
+    # A noncritical vendor cannot be a TPR-01 control exception.
+    assert exceptions.empty
+
+    # Missing security-review evidence does not matter when
+    # the vendor is already known to be outside TPR-01's scope.
+    assert evidence_issues.empty
+
+    # Noncritical vendors are excluded from the assessable
+    # TPR-01 population.
+    assert assessable_population.empty
+
+
+def test_tpr_01_identifies_missing_critical_vendor_status():
+    """
+    Test that TPR-01 identifies missing critical-vendor
+    classification as an evidence-quality issue.
+    """
+
+    # Create two vendor records.
+    #
+    # VND-001 is known to be critical and has completed
+    # a security review.
+    #
+    # VND-008 has a known security-review status, but its
+    # critical-vendor classification is missing. Without that
+    # classification, we cannot determine whether TPR-01 applies.
+    vendors = pd.DataFrame([
+        {
+            'vendor_id': 'VND-001',
+            'critical_vendor': True,
+            'security_review_completed': True
+        },
+        {
+            'vendor_id': 'VND-008',
+            'critical_vendor': None,
+            'security_review_completed': True
+        }
+    ])
+
+    # Run the TPR-01 assessment.
+    exceptions, evidence_issues, assessable_population = assess_tpr_01(
+        vendors
+    )
+
+    # Neither vendor is a confirmed control exception.
+    assert exceptions.empty
+
+    # VND-008 should be classified as an evidence-quality issue
+    # because its critical-vendor status is unknown.
+    assert set(evidence_issues['vendor_id']) == {'VND-008'}
+
+    # Only VND-001 has sufficient evidence to determine both
+    # control scope and compliance.
+    assert set(assessable_population['vendor_id']) == {'VND-001'}

@@ -1,6 +1,10 @@
 import pandas as pd
 
 
+# ============================================================
+# USER EVIDENCE CONFIGURATION
+# ============================================================
+
 # Define the minimum fields required for user-account evidence.
 #
 # A set is useful here because we'll later compare these required
@@ -29,6 +33,12 @@ VALID_EMPLOYMENT_STATUSES = {
     'leave'
 }
 
+
+
+# ============================================================
+# DEVICE EVIDENCE CONFIGURATION
+# ============================================================
+
 # Define the columns required in endpoint evidence.
 #
 # These fields provide the evidence needed by the endpoint
@@ -44,6 +54,11 @@ REQUIRED_DEVICE_COLUMNS = {
     'endpoint_protection'
 }
 
+
+
+# ============================================================
+# USER EVIDENCE LOADER
+# ============================================================
 
 def load_user_evidence(filepath):
     """
@@ -146,6 +161,11 @@ def load_user_evidence(filepath):
     return users
 
 
+
+# ============================================================
+# DEVICE EVIDENCE LOADER
+# ============================================================
+
 def load_device_evidence(filepath):
     """
     Load and validate device evidence from a CSV file.
@@ -215,3 +235,89 @@ def load_device_evidence(filepath):
     return devices
 
 
+
+# ============================================================
+# VENDOR EVIDENCE CONFIGURATION
+# ============================================================
+
+# Define the fields required in Northstar BuildCo's
+# third-party vendor evidence.
+REQUIRED_VENDOR_COLUMNS = {
+    'vendor_id',
+    'vendor_name',
+    'service_type',
+    'critical_vendor',
+    'security_review_completed',
+    'review_date'
+}
+
+
+
+# ============================================================
+# VENDOR EVIDENCE LOADER
+# ============================================================
+
+def load_vendor_evidence(filepath):
+    """
+    Load vendor evidence from a CSV file.
+
+    Parameters:
+        filepath:
+            Path to the vendor evidence CSV file.
+
+    Returns:
+        pandas.DataFrame:
+            Vendor evidence loaded from the CSV file.
+    """
+
+    # Load the vendor evidence into a pandas DataFrame.
+    vendors = pd.read_csv(filepath)
+
+    # Identify any required vendor-evidence columns that
+    # are missing from the supplied CSV file.
+    missing_columns = REQUIRED_VENDOR_COLUMNS - set(vendors.columns)
+
+    # Reject the evidence if its schema is incomplete.
+    #
+    # This prevents incomplete vendor evidence from entering
+    # the control-assessment pipeline.
+    if missing_columns:
+        raise ValueError(
+            f'Missing required vendor columns: {sorted(missing_columns)}'
+        )
+
+    # Define the vendor fields that must contain Boolean values
+    # whenever evidence is present.
+    # 
+    # Blank values are permitted because they represent missing
+    # evidence rather than malformed evidence. The relevant
+    # control assessment will handle missing evidence separately.
+    boolean_columns = [
+        'critical_vendor',
+        'security_review_completed'
+    ]
+
+    # Validate each Boolean vendor-evidence field.
+    for column in boolean_columns:
+
+        # Remove blank values before ving the remaining data.
+        # 
+        # This preserves the distinction between missing evidence
+        # and invalid evidence.
+        non_null_values = vendors[column].dropna()
+
+        #Check that every non-blank value was interpreted as
+        # a Boolean value by pandas.
+        valid_values = non_null_values.map(
+            lambda value: isinstance(value, bool)
+        )
+
+        # Reject unsupported values such as 'yes', 'critical'
+        # or 'completed' rather than allowing ambiguous evidence
+        # into the control-assessment engine.
+        if not valid_values.all():
+            raise ValueError(
+                f"Invalid Boolean value in column '{column}'"
+            )
+
+    return vendors

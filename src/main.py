@@ -2,7 +2,11 @@ from pathlib import Path
 
 # Import the evidence loaders responsible for reading and validating
 # Northstar's user-account and endpoint evidence.
-from src.evidence import load_user_evidence, load_device_evidence
+from src.evidence import (
+    load_user_evidence,
+    load_device_evidence,
+    load_vendor_evidence
+)
 
 # Import the control-assessment functions used by the engine.
 from src.controls import (
@@ -10,7 +14,8 @@ from src.controls import (
     assess_iam_02,
     assess_iam_03,
     assess_end_01,
-    assess_end_02
+    assess_end_02,
+    assess_tpr_01
 )
 
 # Import the reporting function that converts assessment results
@@ -31,6 +36,9 @@ from src.control_catalog import CONTROL_CATALOG
 # Path() provides a clean and portable way to work with filesystem paths.
 USER_EVIDENCE_FILE = Path('data/users.csv')
 DEVICE_EVIDENCE_FILE = Path('data/devices.csv')
+
+# Third-party vendor evidence supports the TPR control domain.
+VENDOR_EVIDENCE_FILE = Path('data/vendors.csv')
 
 # Define the location for the consolidated control-findings report.
 CONTROL_FINDINGS_FILE = Path('output/control_findings.csv')
@@ -55,6 +63,10 @@ def main():
     # Device evidence is maintained separately from user evidence because
     # endpoint controls operate against a different assessment population.
     devices = load_device_evidence(DEVICE_EVIDENCE_FILE)
+
+    # Vendor evidence is maintained separately because third-party
+    # risk controls operate against Northstar's external vendor population.
+    vendors = load_vendor_evidence(VENDOR_EVIDENCE_FILE)
 
 
 
@@ -267,6 +279,51 @@ def main():
 
 
 
+    # ------------------------------------------------------------------
+    # TPR-01 ASSESSMENT
+    # ------------------------------------------------------------------
+
+    # Assess TPR-01:
+    # Critical third-party vendors must have a documented security review.
+    #
+    # The control evaluates vendors classified as critical and determines
+    # whether a documented security review has been completed.
+    tpr_01_exceptions, tpr_01_evidence_issues, tpr_01_population = (
+        assess_tpr_01(vendors)
+    )
+
+    # Retrieve TPR-01 metadata from the centralized control catalog.
+    tpr_01_control = CONTROL_CATALOG['TPR-01']
+
+    # Build the structured finding using the catalog metadata and
+    # the assessment results produced by the TPR-01 control logic.
+    tpr_01_finding = build_control_finding(
+        control_id=tpr_01_control['control_id'],
+        requirement=tpr_01_control['requirement'],
+        assessable_population=tpr_01_population,
+        exceptions=tpr_01_exceptions,
+        evidence_issues=tpr_01_evidence_issues,
+
+        # Vendor IDs identify the affected third-party entities
+        # in the structured finding.
+        identifier_column='vendor_id',
+
+        # Pass the control's NIST CSF 2.0 mapping from the
+        # centralized control catalog into the finding.
+        nist_csf_function=tpr_01_control['nist_csf_function'],
+        nist_csf_category=tpr_01_control['nist_csf_category'],
+        nist_csf_category_name=tpr_01_control['nist_csf_category_name'],
+        nist_csf_subcategory=tpr_01_control['nist_csf_subcategory'],
+        nist_csf_subcategory_outcome=tpr_01_control['nist_csf_subcategory_outcome'],
+
+        # Include the control's baseline risk ratings so that
+        # a failed TPR-01 control can be assigned a finding severity.
+        likelihood=tpr_01_control['likelihood'],
+        impact=tpr_01_control['impact']
+    )
+
+
+
     # ============================================================
     # CONSOLIDATED FINDINGS EXPORT
     # ============================================================
@@ -280,7 +337,8 @@ def main():
         iam_02_finding,
         iam_03_finding,
         end_01_finding,
-        end_02_finding
+        end_02_finding,
+        tpr_01_finding
     ]
 
     # Convert the structured findings into a DataFrame suitable
@@ -469,6 +527,47 @@ def main():
         format_control_finding(
             end_02_finding,
             end_02_control['entity_label']
+        )
+    )
+
+
+
+    # ------------------------------------------------------------------
+    # TPR-01 OUTPUT
+    # ------------------------------------------------------------------
+
+    # Display confirmed TPR-01 control exceptions.
+    print('\n## TPR-01 Control Exceptions')
+    print('----------------------------')
+
+    if tpr_01_exceptions.empty:
+        print('No control exceptions identified.')
+    else:
+        print(tpr_01_exceptions.to_string(index=False))
+
+    # Display TPR-01 evidence-quality issues separately from
+    # confirmed control exceptions.
+    #
+    # A missing security-review status does not automatically
+    # establish that the vendor failed the control.
+    print('\n## TPR-01 Evidence Issues')
+    print('-------------------------')
+
+    if tpr_01_evidence_issues.empty:
+        print('No evidence issues identified.')
+    else:
+        print(tpr_01_evidence_issues.to_string(index=False))
+
+    # Display the structured TPR-01 finding.
+    print('\n## TPR-01 Control Finding')
+    print('-------------------------')
+
+    # Format and display the structured TPR-01 finding using
+    # the vendor entity label defined in the control catalog.
+    print(
+        format_control_finding(
+            tpr_01_finding,
+            tpr_01_control['entity_label']
         )
     )
 

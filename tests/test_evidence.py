@@ -3,8 +3,17 @@ import pytest
 
 # Import the evidence-loading function used to load and validate
 # Northstar's user-account evidence.
-from src.evidence import load_user_evidence, load_device_evidence
+from src.evidence import (
+    load_user_evidence,
+    load_device_evidence,
+    load_vendor_evidence
+)
 
+
+
+# ============================================================
+# USER EVIDENCE TESTS
+# ============================================================
 
 def test_load_user_evidence(tmp_path):
     """
@@ -57,6 +66,11 @@ def test_load_user_evidence(tmp_path):
     assert users['admin_approved'].dtype == bool
 
 
+
+# ============================================================
+# USER EVIDENCE SCHEMA VALIDATION TESTS
+# ============================================================
+
 def test_load_user_evidence_rejects_missing_required_columns(tmp_path):
     """
     Test that user evidence is rejected when a required column is missing.
@@ -85,6 +99,11 @@ def test_load_user_evidence_rejects_missing_required_columns(tmp_path):
     with pytest.raises(ValueError, match='mfa_enabled'):
         load_user_evidence(test_file)
 
+
+
+# ============================================================
+# USER EVIDENCE VALUE VALIDATION TESTS
+# ============================================================
 
 def test_load_user_evidence_rejects_invalid_boolean_values(tmp_path):
     """
@@ -155,6 +174,11 @@ def test_load_user_evidence_rejects_invalid_employment_status(tmp_path):
         load_user_evidence(test_file)
 
 
+
+# ============================================================
+# DEVICE EVIDENCE TESTS
+# ============================================================
+
 def test_load_device_evidence(tmp_path):
     """
     Test that device evidence can be loaded from a CSV file.
@@ -205,6 +229,11 @@ def test_load_device_evidence(tmp_path):
     assert devices['endpoint_protection'].dtype == bool
 
 
+
+# ============================================================
+# DEVICE EVIDENCE SCHEMA VALIDATION TESTS
+# ============================================================
+
 def test_load_device_evidence_rejects_missing_required_columns(tmp_path):
     """
     Test that device evidence is rejected when a required
@@ -234,6 +263,11 @@ def test_load_device_evidence_rejects_missing_required_columns(tmp_path):
     with pytest.raises(ValueError, match='disk_encrypted'):
         load_device_evidence(test_file)
 
+
+
+# ============================================================
+# DEVICE EVIDENCE VALUE VALIDATION TESTS
+# ============================================================
 
 def test_load_device_evidence_rejects_invalid_boolean_values(tmp_path):
     """
@@ -266,5 +300,156 @@ def test_load_device_evidence_rejects_invalid_boolean_values(tmp_path):
     # problematic disk_encrypted field.
     with pytest.raises(ValueError, match='disk_encrypted'):
         load_device_evidence(test_file)
+
+
+
+# ============================================================
+# VENDOR EVIDENCE TESTS
+# ============================================================
+
+def test_load_vendor_evidence():
+    """
+    Test that valid vendor evidence is loaded successfully
+    with the expected columns and records.
+    """
+
+    # Load the Northstar BuildCo vendor evidence file.
+    vendors = load_vendor_evidence('data/vendors.csv')
+
+    # Verify that all seven vendor records were loaded.
+    assert len(vendors) == 7
+
+    # Verify that the expected vendor evidence fields exist.
+    assert list(vendors.columns) == [
+        'vendor_id',
+        'vendor_name',
+        'service_type',
+        'critical_vendor',
+        'security_review_completed',
+        'review_date'
+    ]
+
+    # Verify a representative vendor record so that the test
+    # checks actual evidence values rather than only structure.
+    apex_it = vendors[
+        vendors['vendor_id'] == 'VND-001'
+    ].iloc[0]
+
+    assert apex_it['vendor_name'] == 'Apex IT Services'
+    assert apex_it['critical_vendor'] == True
+    assert apex_it['security_review_completed'] == True
+
+
+
+# ============================================================
+# VENDOR EVIDENCE SCHEMA VALIDATION TESTS
+# ============================================================
+
+def test_load_vendor_evidence_rejects_missing_required_columns(tmp_path):
+    """
+    Test that vendor evidence is rejected when a required
+    column is missing.
+    """
+
+    # Create a temporary vendor-evidence CSV.
+    test_file = tmp_path / 'vendors_missing_security_review.csv'
+
+    # This evidence intentionally omits only the
+    # 'security_review_completed' column.
+    #
+    # All other required vendor fields are present so that
+    # this test specifically isolates the missing security
+    # review field.
+    test_file.write_text(
+        'vendor_id,vendor_name,service_type,critical_vendor,review_date\n'
+        'VND-001,Apex IT Services,Managed Service Provider,true,2026-06-15\n'
+    )
+
+    # The loader should reject incomplete vendor evidence
+    # before it reaches the control-assessment engine.
+    #
+    # Requiring 'security_review_completed' in the error
+    # message also makes the validation failure clear
+    # to the analyst.
+    with pytest.raises(
+        ValueError,
+        match='security_review_completed'
+    ):
+        load_vendor_evidence(test_file)
+
+
+
+# ============================================================
+# VENDOR EVIDENCE VALUE VALIDATION TESTS
+# ============================================================
+
+def test_load_vendor_evidence_rejects_invalid_boolean_values(tmp_path):
+    """
+    Test that vendor evidence is rejected when Boolean fields
+    contain unsupported values.
+    """
+
+    # Create a temporary CSV containing all required vendor columns.
+    #
+    # This allows the evidence to pass schema validation so that
+    # this test specifically exercises Boolean-value validation.
+    test_file = tmp_path / 'vendors_invalid_boolean.csv'
+
+    # critical_vendor='yes' is intentionally invalid.
+    #
+    # The engine expects Boolean evidence such as true or false.
+    # The security_review_completed field contains a valid value
+    # so that this test isolates the critical_vendor field.
+    test_file.write_text(
+        'vendor_id,vendor_name,service_type,critical_vendor,'
+        'security_review_completed,review_date\n'
+        'VND-001,Apex IT Services,Managed Service Provider,'
+        'yes,true,2026-06-15\n'
+    )
+
+    # The loader should reject the malformed vendor evidence
+    # rather than allowing an ambiguous value into the
+    # control-assessment engine.
+    #
+    # Requiring 'critical_vendor' in the error message makes
+    # the validation failure easier for an analyst to diagnose.
+    with pytest.raises(
+        ValueError,
+        match='critical_vendor'
+    ):
+        load_vendor_evidence(test_file)
+
+
+def test_load_vendor_evidence_rejects_invalid_security_review_value(tmp_path):
+    """
+    Test that vendor evidence is rejected when
+    security_review_completed contains an unsupported value.
+    """
+
+    # Create a temporary CSV containing all required vendor columns.
+    #
+    # critical_vendor is deliberately valid so that this test
+    # specifically exercises security_review_completed validation.
+    test_file = tmp_path / 'vendors_invalid_security_review.csv'
+
+    # security_review_completed='completed' is intentionally invalid.
+    #
+    # The field must contain Boolean evidence such as true or false,
+    # or remain blank when the evidence is missing.
+    test_file.write_text(
+        'vendor_id,vendor_name,service_type,critical_vendor,'
+        'security_review_completed,review_date\n'
+        'VND-001,Apex IT Services,Managed Service Provider,'
+        'true,completed,2026-06-15\n'
+    )
+
+    # The loader should reject the malformed value and identify
+    # the field responsible for the validation failure.
+    with pytest.raises(
+        ValueError,
+        match='security_review_completed'
+    ):
+        load_vendor_evidence(test_file)
+
 
 

@@ -1,6 +1,7 @@
 import pandas as pd
 
 
+
 # ============================================================
 # IDENTITY AND ACCESS MANAGEMENT (IAM) CONTROLS
 # ============================================================
@@ -211,6 +212,7 @@ def assess_iam_03(users):
     return exceptions, evidence_issues, assessable_population
 
 
+
 # ============================================================
 # ENDPOINT SECURITY (END) CONTROLS
 # ============================================================
@@ -338,3 +340,59 @@ def assess_end_02(devices):
     return exceptions, evidence_issues, assessable_population
 
 
+
+# ------------------------------------------------------------------
+# TPR 01 CONTROL ASSESSMENT
+# ------------------------------------------------------------------
+
+def assess_tpr_01(vendors):
+    """
+    Assess critical third-party vendors for documented
+    security reviews.
+
+    Args:
+        vendors:
+            DataFrame containing third-party vendor evidence.
+
+    Returns:
+        tuple:
+            Three DataFrames containing:
+            1. confirmed control exceptions
+            2. evidence-quality issues
+            3. the assessable control population
+    """
+
+    # Identify records with missing evidence required to
+    # determine TPR-01 scope or compliance.
+    #
+    # A missing critical_vendor value prevents us from
+    # determining whether the vendor belongs in scope.
+    #
+    # A critical vendor with missing security_review_completed
+    # evidence cannot yet be assessed for compliance.
+    evidence_issues = vendors[
+        vendors['critical_vendor'].isna()
+        | (
+            (vendors['critical_vendor'] == True)
+            & vendors['security_review_completed'].isna()
+        )
+    ]
+
+    # Build the population that can actually be assessed.
+    #
+    # TPR-01 applies only to critical vendors, and their
+    # security-review status must be known.
+    assessable_population = vendors[
+        (vendors['critical_vendor'] == True)
+        & vendors['security_review_completed'].notna()
+    ]
+
+    # Identify confirmed control exceptions.
+    #
+    # A critical vendor is an exception when the available
+    # evidence confirms that a security review was not completed.
+    exceptions = assessable_population[
+        assessable_population['security_review_completed'] == False
+    ]
+
+    return exceptions, evidence_issues, assessable_population

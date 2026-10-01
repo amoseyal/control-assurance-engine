@@ -342,3 +342,53 @@ def test_end_02_has_risk_metadata():
     # Compromise of a company-managed endpoint could have
     # major business and security consequences.
     assert control['impact'] == 4
+
+
+
+# ============================================================
+# THIRD-PARTY RISK CONTROL CATALOG TESTS
+# ============================================================
+
+def test_tpr_01_control_catalog_entry():
+    """
+    Test that TPR-01 is defined in the control catalog with
+    the expected control and NIST CSF 2.0 metadata.
+    """
+
+    # Retrieve the TPR-01 definition from the centralized
+    # control catalog.
+    control = CONTROL_CATALOG['TPR-01']
+
+    # Verify the Control Assurance Engine's internal
+    # control metadata.
+    assert control['control_id'] == 'TPR-01'
+    assert control['domain'] == 'Third-Party Risk'
+    assert control['requirement'] == (
+        'Critical third-party vendors must have a documented '
+        'security review.'
+    )
+    assert control['evidence_source'] == 'vendors.csv'
+    assert control['entity_label'] == 'Vendors'
+
+    # Verify the NIST CSF 2.0 mapping.
+    assert control['nist_csf_function'] == 'Govern'
+    assert control['nist_csf_category'] == 'GV.SC'
+    assert control['nist_csf_category_name'] == (
+        'Cybersecurity Supply Chain Risk Management'
+    )
+    assert control['nist_csf_subcategory'] == 'GV.SC-07'
+    assert control['nist_csf_subcategory_outcome'] == (
+        'The risks posed by a supplier, their products and services, '
+        'and other third parties are understood, recorded, prioritized, '
+        'assessed, responded to, and monitored over the course of the '
+        'relationship'
+    )
+
+    # Verify Northstar BuildCo's baseline risk assumptions
+    # for a failed TPR-01 control assessment.
+    #
+    # These ratings are scenario-specific risk assumptions
+    # defined by the Control Assurance Engine. They are not
+    # prescribed by NIST CSF 2.0.
+    assert control['likelihood'] == 3
+    assert control['impact'] == 4
