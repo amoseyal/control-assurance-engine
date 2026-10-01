@@ -27,7 +27,12 @@ CONTROL_CATALOG = {
         'nist_csf_subcategory': 'PR.AA-03',
         'nist_csf_subcategory_outcome': (
             'Users, services, and hardware are authenticated'
-        )
+        ),
+
+        # Define the baseline risk associated with failure
+        # of this control in the Northstar BuildCo scenario.
+        'likelihood': 4,
+        'impact': 4
     },
 
     'IAM-02': {
@@ -51,7 +56,12 @@ CONTROL_CATALOG = {
                 'defined in a policy, managed, enforced, and reviewed, and '
                 'incorporate the principles of least privilege and '
                 'separation of duties'
-            )
+            ),
+
+            # Definre the baseline risk associated with failure
+            # of this control in the Northstar BuildCo scenario.
+            'likelihood': 3,
+            'impact': 5
         },
 
     'IAM-03': {
@@ -75,7 +85,12 @@ CONTROL_CATALOG = {
             'defined in a policy, managed, enforced, and reviewed, and '
             'incorporate the principles of least privilege and '
             'separation of duties'
-        )
+        ),
+
+        # Define the baseline risk associated with failure
+        # of this control in the Northstar BuildCo scenario.
+        'likelihood': 3,
+        'impact': 5
     },
 
     'END-01': {
@@ -95,7 +110,12 @@ CONTROL_CATALOG = {
         'nist_csf_subcategory_outcome': (
             'The confidentiality, integrity, and availability '
             'of data-at-rest are protected'
-        )
+        ),
+
+        # Definre the baseline risk associated with failure
+        # of this control in the Northstar BuildCo scenario.
+        'likelihood': 3,
+        'impact': 4
     },
 
     'END-02': {
@@ -115,6 +135,11 @@ CONTROL_CATALOG = {
         'nist_csf_subcategory_outcome': (
             'Installation and execution of unauthorized '
             'software are prevented'
-        )
+        ),
+
+        # Definre the baseline risk associated with failure
+        # of this control in the Northstar BuildCo scenario.
+        'likelihood': 4,
+        'impact': 4
     }
 }

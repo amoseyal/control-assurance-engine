@@ -253,3 +253,92 @@ def test_end_02_maps_to_nist_csf():
             'software are prevented'
         )
     )
+
+
+
+# ============================================================
+# TEST RISK METADATA SCHEMA IN CONTROLS CATALOG
+# ============================================================
+
+def test_iam_01_has_risk_metadata():
+    """
+    Verify that IAM-01 defines baseline likelihood and impact
+    ratings for use by the risk-assessment layer.
+    """
+
+    control = CONTROL_CATALOG['IAM-01']
+
+    # Verify that the control defines its baseline likelihood.
+    assert control['likelihood'] == 4
+
+    # Verify that the control defines its baseline impact.
+    assert control['impact'] == 4
+
+
+def test_iam_02_has_risk_metadata():
+    """
+    Verify that IAM-02 defines baseline likelihood and impact
+    ratings for use by the risk-assessment layer.
+    """
+
+    control = CONTROL_CATALOG['IAM-02']
+
+    # Terminated-account access is considered possible
+    # within the Northstar BuildCo assessment scenario.
+    assert control['likelihood'] == 3
+
+    # Unauthorized access through a former employee account
+    # could have severe business and security consequences.
+    assert control['impact'] == 5
+
+
+def test_iam_03_has_risk_metadata():
+    """
+    Verify that IAM-03 defines baseline likelihood and impact
+    ratings for use by the risk-assessment layer.
+    """
+
+    control = CONTROL_CATALOG['IAM-03']
+
+    # Unapproved administrative access is considered possible
+    # within the Northstar BuildCo assessment scenario.
+    assert control['likelihood'] == 3
+
+    # Misuse or compromise of administrative privileges could
+    # have severe consequences across systems and data.
+    assert control['impact'] == 5
+
+
+def test_end_01_has_risk_metadata():
+    """
+    Verify that END-01 defines baseline likelihood and impact
+    ratings for use by the risk-assessment layer.
+    """
+
+    control = CONTROL_CATALOG['END-01']
+
+    # Loss or theft of an unencrypted managed endpoint is
+    # considered possible in the Northstar BuildCo scenario.
+    assert control['likelihood'] == 3
+
+    # Exposure of company data from an unencrypted endpoint
+    # could have major business and security consequences.
+    assert control['impact'] == 4
+
+
+def test_end_02_has_risk_metadata():
+    """
+    Verify that END-02 defines baseline likelihood and impact
+    ratings for use by the risk-assessment layer.
+    """
+
+    control = CONTROL_CATALOG['END-02']
+
+    # Malware or other malicious software reaching an
+    # inadequately protected endpoint is considered likely
+    # in the Northstar BuildCo scenario.
+    assert control['likelihood'] == 4
+
+    # Compromise of a company-managed endpoint could have
+    # major business and security consequences.
+    assert control['impact'] == 4

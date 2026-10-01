@@ -1,5 +1,9 @@
 import pandas as pd
 
+# Import the centralized risk-scoring functions so that
+# reporting does not ducplicate risk-calculation logic.
+from src.risk import calculate_risk_score, classify_risk
+
 
 
 # ============================================================
@@ -17,6 +21,8 @@ def build_control_finding(
         nist_csf_category_name = None,
         nist_csf_subcategory = None,
         nist_csf_subcategory_outcome = None,
+        likelihood = None,
+        impact = None,
         identifier_column = 'username'
 ):
     """
@@ -85,6 +91,27 @@ def build_control_finding(
     # while endpoint controls use device IDs.
     affected_entities = exceptions[identifier_column].tolist()
 
+    # Calculate an active finding risk only when the control
+    # failed and both baseline risk ratings are available.
+    #
+    # A passing control may still have significant underlaying
+    # risk, but it does not represent an active control finding.
+    if (
+        result == 'FAIL'
+        and likelihood is not None
+        and impact is not None
+    ):
+        risk_score = calculate_risk_score(
+            likelihood=likelihood,
+            impact=impact
+        )
+
+        severity = classify_risk(risk_score)
+
+    else:
+        risk_score = None
+        severity = None
+
     # Build one structured finding that can later be displayed,
     # exported, or incorporated into a larger assessment report.
     finding = {
@@ -105,7 +132,14 @@ def build_control_finding(
         'exception_count': exception_count,
         'exception_rate': exception_rate,
         'affected_entities': affected_entities,
-        'evidence_issue_count': len(evidence_issues)
+        'evidence_issue_count': len(evidence_issues),
+
+        # Preserve the control's baseline risk ratings and
+        # calculated risk information in the finding.
+        'likelihood': likelihood,
+        'impact': impact,
+        'risk_score': risk_score,
+        'severity': severity
     }
 
     return finding
@@ -158,8 +192,25 @@ def format_control_finding(finding, entity_label):
         f"Exception Count: {finding['exception_count']}",
         f"Exception Rate: {finding['exception_rate']}%",
         f"Affected {entity_label}: {affected_text}",
-        f"Evidence Issues: {finding['evidence_issue_count']}"
+        f"Evidence Issues: {finding['evidence_issue_count']}",
     ]
+
+    # Include active finding risk information only when a risk
+    # score was calculated.
+    #
+    # Failed controls can receive an active finding risk score
+    # and severity classification. PASS and NOT ASSESSED controls
+    # do not represent active risk findings, so their risk fields
+    # are intentionally omitted from the human-readable output.
+    #
+    # Use get() because risk information is optional in a
+    # structured finding. Findings without risk data should
+    # still be formatted normally.
+    if finding.get('risk_score') is not None:
+        lines.append(f"Likelihood: {finding['likelihood']}")
+        lines.append(f"Impact: {finding['impact']}")
+        lines.append(f"Risk Score: {finding['risk_score']}")
+        lines.append(f"Severity: {finding['severity']}")
 
     # Join the individual fields into one multi-line string.
     #

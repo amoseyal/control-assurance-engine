@@ -91,7 +91,12 @@ def main():
         nist_csf_category=iam_01_control['nist_csf_category'],
         nist_csf_category_name=iam_01_control['nist_csf_category_name'],
         nist_csf_subcategory=iam_01_control['nist_csf_subcategory'],
-        nist_csf_subcategory_outcome=iam_01_control['nist_csf_subcategory_outcome']
+        nist_csf_subcategory_outcome=iam_01_control['nist_csf_subcategory_outcome'],
+
+        # Include the control's baseline risk ratings so that
+        # failed controls can be assigned a finding severity.
+        likelihood=CONTROL_CATALOG['IAM-01']['likelihood'],
+        impact=CONTROL_CATALOG['IAM-01']['impact']
     )
 
 
@@ -127,7 +132,12 @@ def main():
         nist_csf_category=iam_02_control['nist_csf_category'],
         nist_csf_category_name=iam_02_control['nist_csf_category_name'],
         nist_csf_subcategory=iam_02_control['nist_csf_subcategory'],
-        nist_csf_subcategory_outcome=iam_02_control['nist_csf_subcategory_outcome']
+        nist_csf_subcategory_outcome=iam_02_control['nist_csf_subcategory_outcome'],
+
+        # Include the control's baseline risk ratings so that
+        # failed controls can be assigned a finding severity.
+        likelihood=CONTROL_CATALOG['IAM-02']['likelihood'],
+        impact=CONTROL_CATALOG['IAM-02']['impact']
     )
 
 
@@ -163,7 +173,12 @@ def main():
         nist_csf_category=iam_03_control['nist_csf_category'],
         nist_csf_category_name=iam_03_control['nist_csf_category_name'],
         nist_csf_subcategory=iam_03_control['nist_csf_subcategory'],
-        nist_csf_subcategory_outcome=iam_03_control['nist_csf_subcategory_outcome']
+        nist_csf_subcategory_outcome=iam_03_control['nist_csf_subcategory_outcome'],
+
+        # Include the control's baseline risk ratings so that
+        # failed controls can be assigned a finding severity.
+        likelihood=CONTROL_CATALOG['IAM-03']['likelihood'],
+        impact=CONTROL_CATALOG['IAM-03']['impact']
     )
 
 
@@ -200,7 +215,12 @@ def main():
         nist_csf_category=end_01_control['nist_csf_category'],
         nist_csf_category_name=end_01_control['nist_csf_category_name'],
         nist_csf_subcategory=end_01_control['nist_csf_subcategory'],
-        nist_csf_subcategory_outcome=end_01_control['nist_csf_subcategory_outcome']
+        nist_csf_subcategory_outcome=end_01_control['nist_csf_subcategory_outcome'],
+
+        # Include the control's baseline risk ratings so that
+        # failed controls can be assigned a finding severity.
+        likelihood=CONTROL_CATALOG['END-01']['likelihood'],
+        impact=CONTROL_CATALOG['END-01']['impact']
     )
 
 
@@ -237,7 +257,12 @@ def main():
         nist_csf_category=end_02_control['nist_csf_category'],
         nist_csf_category_name=end_02_control['nist_csf_category_name'],
         nist_csf_subcategory=end_02_control['nist_csf_subcategory'],
-        nist_csf_subcategory_outcome=end_02_control['nist_csf_subcategory_outcome']
+        nist_csf_subcategory_outcome=end_02_control['nist_csf_subcategory_outcome'],
+
+        # Include the control's baseline risk ratings so that
+        # failed controls can be assigned a finding severity.
+        likelihood=CONTROL_CATALOG['END-02']['likelihood'],
+        impact=CONTROL_CATALOG['END-02']['impact']
     )
 
 

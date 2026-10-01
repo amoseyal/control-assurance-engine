@@ -72,7 +72,11 @@ def test_build_iam_01_finding():
         ),
         nist_csf_subcategory_outcome=(
             'Users, services, and hardware are authenticated'
-        )
+        ),
+
+        # OInclude the control's baseline rink ratings.
+        likelihood=4,
+        impact=4
     )
 
     # Verify the identity and requirement of the control being reported.
@@ -116,6 +120,13 @@ def test_build_iam_01_finding():
     assert finding['nist_csf_subcategory_outcome'] == (
         'Users, services, and hardware are authenticated'
     )
+
+    # Verify that the control's risk ratings and calculated
+    # risk information are preserved in the finding.
+    assert finding['likelihood'] == 4
+    assert finding['impact'] == 4
+    assert finding['risk_score'] == 16
+    assert finding['severity'] == 'HIGH'
 
 
 def test_build_end_01_finding():
@@ -190,7 +201,12 @@ def test_build_control_finding_returns_not_assessed_for_zero_population():
         requirement='Test control requirement.',
         assessable_population=assessable_population,
         exceptions=exceptions,
-        evidence_issues=evidence_issues
+        evidence_issues=evidence_issues,
+
+        # Include baseline risk ratings to verify that an
+        # unassessed control does not become an active risk finding.
+        likelihood=4,
+        impact=5
     )
 
     # A zero assessable population does not provide enough evidence
@@ -201,6 +217,11 @@ def test_build_control_finding_returns_not_assessed_for_zero_population():
     assert finding['population_tested'] == 0
     assert finding['exception_count'] == 0
     assert finding['exception_rate'] == 0.0
+    
+    # A control that could not be assessed shoudl not receive
+    # an active finding risk score or severity classification.
+    assert finding['risk_score'] is None
+    assert finding['severity'] is None
 
 
 
@@ -225,7 +246,14 @@ def test_format_control_finding():
         'exception_count': 2,
         'exception_rate': 33.3,
         'affected_entities': ['DEV-002', 'DEV-005'],
-        'evidence_issue_count': 1
+        'evidence_issue_count': 1,
+
+        # Include active finding risk information in the
+        # structured finding used by the formatter test.
+        'likelihood': 4,
+        'impact': 4,
+        'risk_score': 16,
+        'severity': 'HIGH'
     }
 
     # Format the structured finding for human-readable output.
@@ -248,6 +276,12 @@ def test_format_control_finding():
     assert 'Affected Devices: DEV-002, DEV-005' in output
     assert 'Evidence Issues: 1' in output
 
+    # Verify that active finding risk information is included
+    # in the homan-readable control finding.
+    assert 'Likelihood: 4' in output
+    assert 'Impact: 4' in output
+    assert 'Risk Score: 16' in output
+    assert 'Severity: HIGH' in output
 
 def test_format_control_finding_with_no_affected_entities():
     """
@@ -352,6 +386,56 @@ def test_build_findings_dataframe():
         'mlopez, jparis, snguyen',
         ''
     ]
+
+
+
+# ============================================================
+# CONTROL RESULT AND RISK SEVERITY TESTS
+# ============================================================
+
+def test_passing_control_has_no_finding_severity():
+    """
+    Verify that a passing control does not receive an active
+    finding severity even when baseline risk ratings exist.
+    """
+
+    # Create an assessable population with no control exceptions.
+    assessable_population = pd.DataFrame([
+        {'username': 'jcarter'},
+        {'username': 'akim'}
+    ])
+
+    # No records violate the control requirement.
+    exceptions = pd.DataFrame(columns=['username'])
+
+    # No evidence-quality issues prevent assessment.
+    evidence_issues = pd.DataFrame(columns=['username'])
+
+    finding = build_control_finding(
+        control_id='TEST-01',
+        requirement='Test control requirement.',
+        assessable_population=assessable_population,
+        exceptions=exceptions,
+        evidence_issues=evidence_issues,
+
+        # The underlying risk could be significant if
+        # this control were to fail.
+        likelihood=4,
+        impact=4
+    )
+
+    # The control itself passed.
+    assert finding['result'] == 'PASS'
+
+    # Baseline risk ratings should remain available
+    # as contextual information.
+    assert finding['likelihood'] == 4
+    assert finding['impact'] == 4
+
+    # A passing control should not generate an active
+    # risk score or finding severity.
+    assert finding['risk_score'] is None
+    assert finding['severity'] is None
 
 
 
