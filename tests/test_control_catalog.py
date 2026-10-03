@@ -26,6 +26,18 @@ def test_control_catalog_contains_iam_01():
     assert control['evidence_source'] == 'users.csv'
     assert control['entity_label'] == 'Accounts'
 
+    # Verify that IAM-01 includes management-readable finding
+    # and remediation guidance.
+    assert CONTROL_CATALOG['IAM-01']['finding_description'] == (
+        'Active user accounts were identified without MFA enabled, '
+        'increasing the risk of unauthorized access if credentials '
+        'are compromised.'
+    )
+
+    assert CONTROL_CATALOG['IAM-01']['recommendation'] == (
+        'Enable MFA for all active user accounts and verify enrollment.'
+    )
+
 
 def test_control_catalog_contains_iam_02():
     """
@@ -48,6 +60,18 @@ def test_control_catalog_contains_iam_02():
     assert control['evidence_source'] == 'users.csv'
     assert control['entity_label'] == 'Accounts'
 
+    # Verify that IAM-02 includes management-readable finding
+    # and remediation guidance.
+    assert CONTROL_CATALOG['IAM-02']['finding_description'] == (
+        'Terminated user accounts were identified as still enabled, '
+        'increasing the risk of unauthorized access after employment ends.'
+    )
+
+    assert CONTROL_CATALOG['IAM-02']['recommendation'] == (
+        'Disable terminated user accounts promptly and verify account '
+        'deactivation as part of the offboarding process.'
+    )
+
 
 def test_control_catalog_contains_iam_03():
     """
@@ -69,6 +93,45 @@ def test_control_catalog_contains_iam_03():
     # Verify the evidence and entity metadata used by reporting.
     assert control['evidence_source'] == 'users.csv'
     assert control['entity_label'] == 'Accounts'
+
+    # Verify that IAM-03 includes management-readable finding
+    # and remediation guidance.
+    assert CONTROL_CATALOG['IAM-03']['finding_description'] == (
+         'Administrative privileges were identified on accounts without '
+         'documented approval, increasing the risk of unauthorized '
+         'privileged access.'
+    )   
+
+    assert CONTROL_CATALOG['IAM-03']['recommendation'] == (
+        'Remove unapproved administrative privileges or document appropriate '
+        'authorization, and periodically review privileged account access.'
+    )
+
+    # Verify that IAM-03 includes management-readable finding
+    # and remediation guidance.
+    assert CONTROL_CATALOG['IAM-03']['finding_description'] == (
+        'Administrative privileges were identified on accounts without '
+        'documented approval, increasing the risk of unauthorized '
+        'privileged access.'
+    )
+
+    assert CONTROL_CATALOG['IAM-03']['recommendation'] == (
+        'Remove unapproved administrative privileges or document appropriate '
+        'authorization, and periodically review privileged account access.'
+    )
+
+    # Verify that END-01 includes management-readable finding
+    # and remediation guidance.
+    assert CONTROL_CATALOG['END-01']['finding_description'] == (
+        'Company-managed endpoints were identified without disk encryption, '
+        'increasing the risk of unauthorized access to data if a device '
+        'is lost, stolen, or otherwise physically compromised.'
+    )
+
+    assert CONTROL_CATALOG['END-01']['recommendation'] == (
+        'Enable full-disk encryption on all company-managed endpoints and '
+        'periodically verify encryption status through endpoint management.'
+)
 
 
 def test_control_catalog_contains_end_01():
@@ -114,6 +177,18 @@ def test_control_catalog_contains_end_02():
     assert control['evidence_source'] == 'devices.csv'
     assert control['entity_label'] == 'Devices'
 
+    # Verify that END-02 includes management-readable finding
+    # and remediation guidance.
+    assert CONTROL_CATALOG['END-02']['finding_description'] == (
+        'Company-managed endpoints were identified without endpoint '
+        'protection enabled, increasing exposure to malware and other '
+        'endpoint-based threats.'
+    )
+
+    assert CONTROL_CATALOG['END-02']['recommendation'] == (
+        'Enable and centrally manage endpoint protection on all '
+        'company-managed endpoints and periodically verify protection status.'
+    )
 
 
 # ============================================================
@@ -393,6 +468,19 @@ def test_tpr_01_control_catalog_entry():
     assert control['likelihood'] == 3
     assert control['impact'] == 4
 
+    # Verify that TPR-01 includes management-readable finding
+    # and remediation guidance.
+    assert CONTROL_CATALOG['TPR-01']['finding_description'] == (
+        'Critical third-party vendors were identified without a documented '
+       'security review, limiting the organization\'s ability to understand '
+       'and manage cybersecurity risks introduced by those vendors.'
+    )
+
+    assert CONTROL_CATALOG['TPR-01']['recommendation'] == (
+       'Complete and document security reviews for all critical third-party '
+       'vendors and establish a process for periodic reassessment.'
+    )
+
 
 def test_tpr_02_control_catalog_entry():
     """
@@ -436,4 +524,15 @@ def test_tpr_02_control_catalog_entry():
     assert control['likelihood'] == 3
     assert control['impact'] == 5
 
+    # Verify that TPR-02 includes management-readable finding
+    # and remediation guidance.
+    assert CONTROL_CATALOG['TPR-02']['finding_description'] == (
+        'Third-party vendors with privileged access were identified without '
+        'MFA enabled, increasing the risk that compromised vendor credentials '
+        'could be used to gain unauthorized privileged access.'
+    )
 
+    assert CONTROL_CATALOG['TPR-02']['recommendation'] == (
+        'Require MFA for all third-party vendors with privileged access and '
+        'periodically verify that MFA remains enforced.'
+    )

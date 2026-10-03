@@ -7,6 +7,10 @@ import pandas as pd
 from src.reporting import (
     build_control_finding,
     build_findings_dataframe,
+    build_executive_summary,
+    format_executive_summary,
+    build_management_findings,
+    format_management_findings,
     export_findings_csv,
     format_control_finding
 )
@@ -76,7 +80,19 @@ def test_build_iam_01_finding():
 
         # OInclude the control's baseline rink ratings.
         likelihood=4,
-        impact=4
+        impact=4,
+
+        # Provide management-readable context describing the
+        # condition identified by the control assessment.
+        finding_description=(
+            'Three active user accounts were identified without MFA enabled.'
+        ),
+
+        # Provide a management action that addresses the
+        # condition identified by the control assessment.
+        recommendation=(
+            'Enable MFA for all active user accounts and verify enrollment.'
+        ),
     )
 
     # Verify the identity and requirement of the control being reported.
@@ -127,6 +143,18 @@ def test_build_iam_01_finding():
     assert finding['impact'] == 4
     assert finding['risk_score'] == 16
     assert finding['severity'] == 'HIGH'
+
+    # Verify that the management-readable finding description
+    # is preserved in the structured finding.
+    assert finding['finding_description'] == (
+        'Three active user accounts were identified without MFA enabled.'
+    )
+
+    # Verify that the recommended management action is
+    # preserved in the structured finding.
+    assert finding['recommendation'] == (
+        'Enable MFA for all active user accounts and verify enrollment.'
+    )
 
 
 def test_build_end_01_finding():
@@ -253,7 +281,16 @@ def test_format_control_finding():
         'likelihood': 4,
         'impact': 4,
         'risk_score': 16,
-        'severity': 'HIGH'
+        'severity': 'HIGH',
+
+        # Include management-readable context appropriate for
+        # the END-01 endpoint encryption control.
+        'finding_description': (
+            'Company-managed endpoints were identified without disk encryption.'
+        ),
+        'recommendation': (
+            'Enable full-disk encryption on all company-managed endpoints.'
+        )
     }
 
     # Format the structured finding for human-readable output.
@@ -282,6 +319,20 @@ def test_format_control_finding():
     assert 'Impact: 4' in output
     assert 'Risk Score: 16' in output
     assert 'Severity: HIGH' in output
+
+    # Verify that management context is included in the
+    # human-readable control finding.
+    assert (
+        'Finding: Company-managed endpoints were identified without disk encryption.'
+        in output
+    )
+
+    assert (
+        'Recommendation: Enable full-disk encryption on all '
+        'company-managed endpoints.'
+        in output
+    )
+
 
 def test_format_control_finding_with_no_affected_entities():
     """
@@ -436,6 +487,218 @@ def test_passing_control_has_no_finding_severity():
     # risk score or finding severity.
     assert finding['risk_score'] is None
     assert finding['severity'] is None
+
+
+
+# ============================================================
+# EXECUTIVE SUMMARY
+# ============================================================
+
+def test_build_executive_summary():
+    """
+    Test that individual control findings are aggregated into
+    executive-level assessment metrics.
+    """
+
+    # Create representative control findings with different
+    # assessment results, exception counts, and risk severities.
+    findings = [
+        {
+            'control_id': 'IAM-01',
+            'result': 'FAIL',
+            'exception_count': 3,
+            'evidence_issue_count': 2,
+            'severity': 'HIGH'
+        },
+        {
+            'control_id': 'END-02',
+            'result': 'PASS',
+            'exception_count': 0,
+            'evidence_issue_count': 0,
+            'severity': None
+        },
+        {
+            'control_id': 'TPR-01',
+            'result': 'NOT ASSESSED',
+            'exception_count': 0,
+            'evidence_issue_count': 1,
+            'severity': None
+        }
+    ]
+
+    # Build an executive summary from the individual
+    # control assessment results.
+    summary = build_executive_summary(findings)
+
+    # Verify the overall control-assessment metrics.
+    assert summary['controls_assessed'] == 3
+    assert summary['passed'] == 1
+    assert summary['failed'] == 1
+    assert summary['not_assessed'] == 1
+
+    # Verify aggregated exception and evidence-quality metrics.
+    assert summary['total_exceptions'] == 3
+    assert summary['evidence_issues'] == 3
+
+    # Verify executive-level severity counts.
+    assert summary['high_findings'] == 1
+    assert summary['critical_findings'] == 0
+
+
+def test_format_executive_summary():
+    """
+    Test that executive-level assessment metrics are converted
+    into concise, human-readable management output.
+    """
+
+    # Create representative executive-level assessment metrics.
+    summary = {
+        'controls_assessed': 7,
+        'passed': 1,
+        'failed': 6,
+        'not_assessed': 0,
+        'total_exceptions': 9,
+        'evidence_issues': 4,
+        'high_findings': 6,
+        'critical_findings': 0
+    }
+
+    # Format the structured metrics for management reporting.
+    output = format_executive_summary(summary)
+
+    # Verify that the executive summary clearly communicates
+    # the overall assessment results.
+    assert 'Controls Evaluated: 7' in output
+    assert 'Passed: 1' in output
+    assert 'Failed: 6' in output
+    assert 'Not Assessed: 0' in output
+
+    # Verify that control exceptions and evidence-quality
+    # issues are reported separately.
+    assert 'Total Exceptions: 9' in output
+    assert 'Evidence Issues: 4' in output
+
+    # Verify that significant finding severities are summarized
+    # for management attention.
+    assert 'High Findings: 6' in output
+    assert 'Critical Findings: 0' in output
+
+
+
+# ------------------------------------------------------------
+# MANAGEMENT FINDINGS
+# ------------------------------------------------------------
+
+def test_build_management_findings():
+    """
+    Test that the management findings summary includes only
+    controls with confirmed FAIL results requiring remediation.
+    """
+
+    # Create representative findings covering failed, passed,
+    # and not-assessed control results.
+    findings = [
+        {
+            'control_id': 'IAM-01',
+            'result': 'FAIL',
+            'severity': 'HIGH',
+            'affected_entities': ['mlopez', 'snguyen']
+        },
+        {
+            'control_id': 'END-02',
+            'result': 'PASS',
+            'severity': None,
+            'affected_entities': []
+        },
+        {
+            'control_id': 'TPR-01',
+            'result': 'NOT ASSESSED',
+            'severity': None,
+            'affected_entities': []
+        },
+        {
+            'control_id': 'TPR-02',
+            'result': 'FAIL',
+            'severity': 'HIGH',
+            'affected_entities': ['VND-002']
+        }
+    ]
+
+    # Build the management view containing only confirmed
+    # control failures that require remediation.
+    management_findings = build_management_findings(findings)
+
+    # Verify that only failed controls are included.
+    assert len(management_findings) == 2
+    assert management_findings[0]['control_id'] == 'IAM-01'
+    assert management_findings[1]['control_id'] == 'TPR-02'
+
+    # Verify that PASS and NOT ASSESSED controls are excluded
+    # from the remediation-focused management view.
+    assert all(
+        finding['result'] == 'FAIL'
+        for finding in management_findings
+    )
+
+
+def test_format_management_findings():
+    """
+    Test that failed control findings are converted into a concise,
+    actionable management remediation summary.
+    """
+
+    # Create representative failed findings containing the
+    # information management needs to understand and remediate
+    # each confirmed control deficiency.
+    management_findings = [
+        {
+            'control_id': 'IAM-01',
+            'severity': 'HIGH',
+            'affected_entities': ['mlopez', 'snguyen'],
+            'finding_description': (
+                'Active user accounts were identified without MFA enabled.'
+            ),
+            'recommendation': (
+                'Enable MFA for all active user accounts and verify enrollment.'
+            )
+        },
+        {
+            'control_id': 'TPR-02',
+            'severity': 'HIGH',
+            'affected_entities': ['VND-002'],
+            'finding_description': (
+                'Third-party vendors with privileged access were identified '
+                'without MFA enabled.'
+            ),
+            'recommendation': (
+                'Require MFA for all third-party vendors with privileged access.'
+            )
+        }
+    ]
+
+    # Format the failed findings into a management-readable
+    # remediation summary.
+    output = format_management_findings(management_findings)
+
+    # Verify that each failed control and its severity are shown.
+    assert 'IAM-01 | HIGH' in output
+    assert 'TPR-02 | HIGH' in output
+
+    # Verify that the affected entities are identified.
+    assert 'Affected: mlopez, snguyen' in output
+    assert 'Affected: VND-002' in output
+
+    # Verify that management receives both the finding context
+    # and the recommended remediation action.
+    assert (
+        'Active user accounts were identified without MFA enabled.'
+        in output
+    )
+    assert (
+        'Recommendation: Enable MFA for all active user accounts '
+        'and verify enrollment.'
+        in output
+    )
 
 
 

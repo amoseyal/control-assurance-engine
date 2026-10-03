@@ -23,9 +23,13 @@ from src.controls import (
 # into a structured GRC control finding.
 from src.reporting import (
     build_control_finding,
+    format_control_finding,
+    build_executive_summary,
+    format_executive_summary,
+    build_management_findings,
+    format_management_findings,
     build_findings_dataframe,
-    export_findings_csv,
-    format_control_finding
+    export_findings_csv
 )
 
 # Import the centralized control metadata catalog.
@@ -94,6 +98,12 @@ def main():
     iam_01_finding = build_control_finding(
         control_id=iam_01_control['control_id'],
         requirement=iam_01_control['requirement'],
+
+        # Pass the control-specific management context from the
+        # centralized catalog into the structured finding.
+        finding_description=iam_01_control['finding_description'],
+        recommendation=iam_01_control['recommendation'],
+
         assessable_population=iam_01_population,
         exceptions=iam_01_exceptions,
         evidence_issues=iam_01_evidence_issues,
@@ -135,6 +145,12 @@ def main():
     iam_02_finding = build_control_finding(
         control_id=iam_02_control['control_id'],
         requirement=iam_02_control['requirement'],
+
+        # Pass the control-specific management context from the
+        # centralized catalog into the structured finding.
+        finding_description=iam_02_control['finding_description'],
+        recommendation=iam_02_control['recommendation'],
+
         assessable_population=iam_02_population,
         exceptions=iam_02_exceptions,
         evidence_issues=iam_02_evidence_issues,
@@ -176,6 +192,12 @@ def main():
     iam_03_finding = build_control_finding(
         control_id=iam_03_control['control_id'],
         requirement=iam_03_control['requirement'],
+
+        # Pass the control-specific management context from the
+        # centralized catalog into the structured finding.
+        finding_description=iam_03_control['finding_description'],
+        recommendation=iam_03_control['recommendation'],
+
         assessable_population=iam_03_population,
         exceptions=iam_03_exceptions,
         evidence_issues=iam_03_evidence_issues,
@@ -217,6 +239,12 @@ def main():
     end_01_finding = build_control_finding(
         control_id=end_01_control['control_id'],
         requirement=end_01_control['requirement'],
+
+        # Pass the control-specific management context from the
+        # centralized catalog into the structured finding.
+        finding_description=end_01_control['finding_description'],
+        recommendation=end_01_control['recommendation'],
+
         assessable_population=end_01_population,
         exceptions=end_01_exceptions,
         evidence_issues=end_01_evidence_issues,
@@ -259,6 +287,12 @@ def main():
     end_02_finding = build_control_finding(
         control_id=end_02_control['control_id'],
         requirement=end_02_control['requirement'],
+
+        # Pass the control-specific management context from the
+        # centralized catalog into the structured finding.
+        finding_description=end_02_control['finding_description'],
+        recommendation=end_02_control['recommendation'],
+
         assessable_population=end_02_population,
         exceptions=end_02_exceptions,
         evidence_issues=end_02_evidence_issues,
@@ -301,6 +335,12 @@ def main():
     tpr_01_finding = build_control_finding(
         control_id=tpr_01_control['control_id'],
         requirement=tpr_01_control['requirement'],
+
+        # Pass the control-specific management context from the
+        # centralized catalog into the structured finding.
+        finding_description=tpr_01_control['finding_description'],
+        recommendation=tpr_01_control['recommendation'],
+
         assessable_population=tpr_01_population,
         exceptions=tpr_01_exceptions,
         evidence_issues=tpr_01_evidence_issues,
@@ -346,6 +386,12 @@ def main():
     tpr_02_finding = build_control_finding(
         control_id=tpr_02_control['control_id'],
         requirement=tpr_02_control['requirement'],
+
+        # Pass the control-specific management context from the
+        # centralized catalog into the structured finding.
+        finding_description=tpr_02_control['finding_description'],
+        recommendation=tpr_02_control['recommendation'],
+
         assessable_population=tpr_02_population,
         exceptions=tpr_02_exceptions,
         evidence_issues=tpr_02_evidence_issues,
@@ -367,8 +413,8 @@ def main():
     # CONSOLIDATED FINDINGS EXPORT
     # ============================================================
 
-#        Combine all structured control findings into a single collection.
-#
+    #Combine all structured control findings into a single collection.
+    #
     # Keeping the findings together allows the reporting layer to
     # convert the complete assessment into one tabular report.
     all_findings = [
@@ -381,6 +427,16 @@ def main():
         tpr_02_finding
     ]
 
+    # Build executive-level assessment metrics from the complete
+    # set of structured control findings.
+    executive_summary = build_executive_summary(all_findings)
+
+    # Display the executive-level assessment summary before the
+    # detailed individual control findings.
+    print('\n## Executive Summary')
+    print('--------------------')
+    print(format_executive_summary(executive_summary))
+
     # Convert the structured findings into a DataFrame suitable
     # for reporting and export.
     findings_dataframe = build_findings_dataframe(all_findings)
@@ -390,6 +446,16 @@ def main():
         findings_dataframe,
         CONTROL_FINDINGS_FILE
     )
+
+
+    # Build a remediation-focused management view containing only
+    # confirmed control failures.
+    management_findings = build_management_findings(all_findings)
+
+    # Display the failed controls that require management action.
+    print('\n## Findings Requiring Remediation')
+    print('---------------------------------')
+    print(format_management_findings(management_findings))
 
 
 
@@ -613,7 +679,7 @@ def main():
 
 
 
-        # ------------------------------------------------------------------
+    # ------------------------------------------------------------------
     # TPR-02 OUTPUT
     # ------------------------------------------------------------------
 

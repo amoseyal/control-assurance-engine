@@ -16,6 +16,8 @@ def build_control_finding(
         assessable_population,
         exceptions,
         evidence_issues,
+        finding_description=None,
+        recommendation=None,
         nist_csf_function = None,
         nist_csf_category = None,
         nist_csf_category_name = None,
@@ -118,6 +120,14 @@ def build_control_finding(
         'control_id': control_id,
         'requirement': requirement,
 
+        # Management-readable explanation of the condition
+        # identified during control assessment.
+        'finding_description': finding_description,
+
+        # Recommended management action for addressing the
+        # condition identified by the control assessment.
+        'recommendation': recommendation,
+
         # Preserve the control's NIST CSF 2.0 mapping
         # in the structured finding.
         'nist_csf_function': nist_csf_function,
@@ -195,6 +205,20 @@ def format_control_finding(finding, entity_label):
         f"Evidence Issues: {finding['evidence_issue_count']}",
     ]
 
+    # Include management-readable context when it is available.
+    #
+    # Using .get() keeps these fields optional so older or simpler
+    # findings can still be formatted without raising an error.
+    if finding.get('finding_description'):
+        lines.append(
+            f"Finding: {finding['finding_description']}"
+        )
+
+    if finding.get('recommendation'):
+        lines.append(
+            f"Recommendation: {finding['recommendation']}"
+        )
+
     # Include active finding risk information only when a risk
     # score was calculated.
     #
@@ -218,6 +242,197 @@ def format_control_finding(finding, entity_label):
     # directly. This keeps reporting logic reusable for future
     # console output, text files, or other report formats.
     return '\n'.join(lines)
+
+
+
+# ============================================================
+# EXECUTIVE SUMMARY
+# ============================================================
+
+def build_executive_summary(findings):
+    """
+    Aggregate individual control findings into executive-level
+    assessment metrics.
+
+    Args:
+        findings:
+            List of structured control finding dictionaries.
+
+    Returns:
+        dict:
+            Summary metrics describing control results, exceptions,
+            evidence issues, and finding severity.
+    """
+
+    # Count the total number of controls included in the assessment.
+    controls_assessed = len(findings)
+
+    # Count controls by assessment result.
+    passed = sum(
+        1 for finding in findings
+        if finding['result'] == 'PASS'
+    )
+
+    failed = sum(
+        1 for finding in findings
+        if finding['result'] == 'FAIL'
+    )
+
+    not_assessed = sum(
+        1 for finding in findings
+        if finding['result'] == 'NOT ASSESSED'
+    )
+
+    # Aggregate confirmed control exceptions across all findings.
+    total_exceptions = sum(
+        finding['exception_count']
+        for finding in findings
+    )
+
+    # Aggregate evidence-quality issues separately from confirmed
+    # control exceptions.
+    evidence_issues = sum(
+        finding['evidence_issue_count']
+        for finding in findings
+    )
+
+    # Count active findings by executive-level risk severity.
+    high_findings = sum(
+        1 for finding in findings
+        if finding.get('severity') == 'HIGH'
+    )
+
+    critical_findings = sum(
+        1 for finding in findings
+        if finding.get('severity') == 'CRITICAL'
+    )
+
+    # Return a structured summary that can later be formatted
+    # for management reporting or exported to another format.
+    return {
+        'controls_assessed': controls_assessed,
+        'passed': passed,
+        'failed': failed,
+        'not_assessed': not_assessed,
+        'total_exceptions': total_exceptions,
+        'evidence_issues': evidence_issues,
+        'high_findings': high_findings,
+        'critical_findings': critical_findings
+    }
+
+
+def format_executive_summary(summary):
+    """
+    Convert structured executive-level assessment metrics into
+    concise, human-readable management output.
+
+    Args:
+        summary:
+            Dictionary containing aggregated assessment metrics.
+
+    Returns:
+        str:
+            Formatted executive summary text.
+    """
+
+    # Build a concise management-level view of the assessment.
+    #
+    # Control results, confirmed exceptions, evidence-quality
+    # issues, and finding severity remain distinct so management
+    # can interpret each metric independently.
+    lines = [
+        f"Controls Evaluated: {summary['controls_assessed']}",
+        f"Passed: {summary['passed']}",
+        f"Failed: {summary['failed']}",
+        f"Not Assessed: {summary['not_assessed']}",
+        f"Total Exceptions: {summary['total_exceptions']}",
+        f"Evidence Issues: {summary['evidence_issues']}",
+        f"High Findings: {summary['high_findings']}",
+        f"Critical Findings: {summary['critical_findings']}"
+    ]
+
+    # Join each metric on a separate line for readable
+    # console and report output.
+    return '\n'.join(lines)
+
+
+
+# ------------------------------------------------------------
+# MANAGEMENT FINDINGS
+# ------------------------------------------------------------
+
+def build_management_findings(findings):
+    """
+    Build a remediation-focused management view containing
+    only confirmed control failures.
+
+    Args:
+        findings:
+            List of structured control finding dictionaries.
+
+    Returns:
+        list:
+            Structured findings for controls with a FAIL result.
+    """
+
+    # Include only confirmed control failures.
+    #
+    # PASS controls do not require remediation, while
+    # NOT ASSESSED controls represent assessment limitations
+    # rather than confirmed control deficiencies.
+    management_findings = [
+        finding
+        for finding in findings
+        if finding['result'] == 'FAIL'
+    ]
+
+    # Preserve each original structured finding so later
+    # reporting functions can use its complete metadata.
+    return management_findings
+
+
+def format_management_findings(management_findings):
+    """
+    Convert failed control findings into a concise,
+    management-readable remediation summary.
+
+    Args:
+        management_findings:
+            List of structured findings for controls with
+            confirmed FAIL results.
+
+    Returns:
+        str:
+            Formatted management findings summary.
+    """
+
+    # Build a separate text block for each failed control.
+    formatted_findings = []
+
+    for finding in management_findings:
+        # Convert the affected-entity list into a readable
+        # comma-separated string.
+        affected_entities = finding.get('affected_entities', [])
+
+        if affected_entities:
+            affected_text = ', '.join(affected_entities)
+        else:
+            affected_text = 'None'
+
+        # Build the management-facing text for this finding.
+        lines = [
+            f"{finding['control_id']} | {finding['severity']}",
+            finding['finding_description'],
+            f"Affected: {affected_text}",
+            f"Recommendation: {finding['recommendation']}"
+        ]
+
+        # Store the completed finding block.
+        formatted_findings.append('\n'.join(lines))
+
+    # Separate individual findings with a blank line so the
+    # remediation summary remains easy to scan.
+    return '\n\n'.join(formatted_findings)
 
 
 

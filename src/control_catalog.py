@@ -32,7 +32,21 @@ CONTROL_CATALOG = {
         # Define the baseline risk associated with failure
         # of this control in the Northstar BuildCo scenario.
         'likelihood': 4,
-        'impact': 4
+        'impact': 4,
+
+        # Management-readable explanation of the condition and
+        # the security risk created when the control fails.
+        'finding_description': (
+            'Active user accounts were identified without MFA enabled, '
+            'increasing the risk of unauthorized access if credentials '
+            'are compromised.'
+        ),
+
+        # Recommended management action for remediating the
+        # control deficiency.
+        'recommendation': (
+            'Enable MFA for all active user accounts and verify enrollment.'
+        ),
     },
 
     'IAM-02': {
@@ -61,8 +75,22 @@ CONTROL_CATALOG = {
             # Definre the baseline risk associated with failure
             # of this control in the Northstar BuildCo scenario.
             'likelihood': 3,
-            'impact': 5
-        },
+            'impact': 5,
+
+            # Management-readable explanation of the condition and
+            # the security risk created when the control fails.
+            'finding_description': (
+            'Terminated user accounts were identified as still enabled, '
+            'increasing the risk of unauthorized access after employment ends.'
+            ),
+
+            # Recommended management action for remediating the
+            # control deficiency.
+            'recommendation': (
+            'Disable terminated user accounts promptly and verify account '
+            'deactivation as part of the offboarding process.'
+            ),
+    },
 
     'IAM-03': {
         'control_id': 'IAM-03',
@@ -90,7 +118,22 @@ CONTROL_CATALOG = {
         # Define the baseline risk associated with failure
         # of this control in the Northstar BuildCo scenario.
         'likelihood': 3,
-        'impact': 5
+        'impact': 5,
+
+        # Management-readable explanation of the condition and
+        # the security risk created when the control fails.
+        'finding_description': (
+            'Administrative privileges were identified on accounts without '
+            'documented approval, increasing the risk of unauthorized '
+            'privileged access.'
+        ),
+
+        # Recommended management action for remediating the
+        # control deficiency.
+        'recommendation': (
+            'Remove unapproved administrative privileges or document appropriate '
+            'authorization, and periodically review privileged account access.'
+        ),
     },
 
     'END-01': {
@@ -115,7 +158,22 @@ CONTROL_CATALOG = {
         # Definre the baseline risk associated with failure
         # of this control in the Northstar BuildCo scenario.
         'likelihood': 3,
-        'impact': 4
+        'impact': 4,
+
+        # Management-readable explanation of the condition and
+        # the security risk created when the control fails.
+        'finding_description': (
+            'Company-managed endpoints were identified without disk encryption, '
+            'increasing the risk of unauthorized access to data if a device '
+            'is lost, stolen, or otherwise physically compromised.'
+        ),
+
+        # Recommended management action for remediating the
+        # control deficiency.
+        'recommendation': (
+            'Enable full-disk encryption on all company-managed endpoints and '
+            'periodically verify encryption status through endpoint management.'
+        ),
     },
 
     'END-02': {
@@ -140,7 +198,22 @@ CONTROL_CATALOG = {
         # Definre the baseline risk associated with failure
         # of this control in the Northstar BuildCo scenario.
         'likelihood': 4,
-        'impact': 4
+        'impact': 4,
+
+        # Management-readable explanation of the condition and
+        # the security risk created when the control fails.
+        'finding_description': (
+            'Company-managed endpoints were identified without endpoint '
+            'protection enabled, increasing exposure to malware and other '
+            'endpoint-based threats.'
+        ),
+
+        # Recommended management action for remediating the
+        # control deficiency.
+        'recommendation': (
+            'Enable and centrally manage endpoint protection on all '
+            'company-managed endpoints and periodically verify protection status.'
+        ),
     },
 
     'TPR-01': {
@@ -189,7 +262,22 @@ CONTROL_CATALOG = {
         # These ratings are scenario-specific and are not
         # prescribed by NIST CSF 2.0.
         'likelihood': 3,
-        'impact': 4
+        'impact': 4,
+
+        # Management-readable explanation of the condition and
+        # the security risk created when the control fails.
+        'finding_description': (
+            'Critical third-party vendors were identified without a documented '
+            'security review, limiting the organization\'s ability to understand '
+            'and manage cybersecurity risks introduced by those vendors.'
+        ),
+
+        # Recommended management action for remediating the
+        # control deficiency.
+        'recommendation': (
+            'Complete and document security reviews for all critical third-party '
+            'vendors and establish a process for periodic reassessment.'
+        ),
     },
 
     'TPR-02': {
@@ -231,6 +319,21 @@ CONTROL_CATALOG = {
     # of a confirmed TPR-02 failure. Active finding severity is
     # assigned later only when the control actually fails.
     'likelihood': 3,
-    'impact': 5
+    'impact': 5,
+
+    # Management-readable explanation of the condition and
+    # the security risk created when the control fails.
+    'finding_description': (
+        'Third-party vendors with privileged access were identified without '
+        'MFA enabled, increasing the risk that compromised vendor credentials '
+        'could be used to gain unauthorized privileged access.'
+    ),
+
+    # Recommended management action for remediating the
+    # control deficiency.
+    'recommendation': (
+        'Require MFA for all third-party vendors with privileged access and '
+        'periodically verify that MFA remains enforced.'
+    ),
     }
 }
