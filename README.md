@@ -354,6 +354,99 @@ control-assurance-engine/
 └── requirements.txt
 ```
 
+### Input Evidence Schema
+
+The engine expects three CSV evidence files with predefined column schemas. Required columns must be present for evidence ingestion to succeed; however, some individual field values may be blank.
+
+This distinction is intentional. A **required column** defines the structure expected from the evidence source, while a **nullable value** allows the control-assessment logic to determine whether missing information constitutes an evidence issue for a particular control.
+
+Boolean evidence fields use `true` and `false`. Where null values are permitted, a blank CSV value represents unavailable or missing evidence.
+
+#### User Evidence Schema — `data/users.csv`
+
+| Field | Type | Required Column | Null Allowed | Description |
+| --- | --- | :---: | :---: | --- |
+| `username` | String | Yes | No* | User account identifier |
+| `first_name` | String | Yes | No* | User's first name |
+| `last_name` | String | Yes | No* | User's last name |
+| `email_address` | String | Yes | No* | User's email address |
+| `department` | String | Yes | No* | Organizational department |
+| `employment_status` | String | Yes | Yes | Employment status: `active`, `terminated`, or `leave` |
+| `enabled` | Boolean | Yes | Yes | Whether the user account is enabled |
+| `mfa_enabled` | Boolean | Yes | Yes | Whether MFA is enabled for the account |
+| `is_admin` | Boolean | Yes | Yes | Whether the account has administrative privileges |
+| `admin_approved` | Boolean | Yes | Yes | Whether administrative privileges have documented approval |
+
+\* Version 1 requires these columns to exist but does not currently perform explicit null-value validation on these descriptive identity fields.
+
+The IAM controls use the evidence fields differently depending on the control being evaluated:
+
+- **IAM-01** uses `enabled` and `mfa_enabled` to evaluate MFA for active accounts.
+- **IAM-02** uses `employment_status` and `enabled` to evaluate account deactivation for terminated users.
+- **IAM-03** uses `is_admin` and `admin_approved` to evaluate authorization of administrative privileges.
+
+A missing value is therefore not automatically an evidence issue for every IAM control. Its significance depends on whether the field is required to determine scope or evaluate an in-scope record for that specific control.
+
+#### Device Evidence Schema — `data/devices.csv`
+
+| Field | Type | Required Column | Null Allowed | Description |
+| --- | --- | :---: | :---: | --- |
+| `device_id` | String | Yes | No* | Unique device identifier |
+| `device_name` | String | Yes | No* | Device hostname or descriptive name |
+| `assigned_user` | String | Yes | No* | User associated with the device |
+| `device_type` | String | Yes | No* | Device classification, such as laptop or desktop |
+| `operating_system` | String | Yes | No* | Operating system installed on the device |
+| `company_managed` | Boolean | Yes | Yes | Whether the device is managed by the organization |
+| `disk_encrypted` | Boolean | Yes | Yes | Whether disk encryption is enabled |
+| `endpoint_protection` | Boolean | Yes | Yes | Whether endpoint protection is enabled |
+
+\* Version 1 requires these columns to exist but does not currently perform explicit null-value validation on these descriptive device fields.
+
+The Endpoint Security controls use `company_managed` to determine whether a device falls within the control scope:
+
+- **END-01** evaluates `disk_encrypted` for company-managed devices.
+- **END-02** evaluates `endpoint_protection` for company-managed devices.
+
+If `company_managed` is missing, the engine cannot determine whether the device is in scope, so the record becomes an evidence issue for the applicable endpoint control.
+
+If a device is confirmed as company-managed but the control-specific security field is missing, the record is also treated as an evidence issue because compliance cannot be determined.
+
+Conversely, a device explicitly identified as unmanaged is outside the scope of these controls. Missing or noncompliant encryption or endpoint-protection values on that device do not create control exceptions.
+
+#### Vendor Evidence Schema — `data/vendors.csv`
+
+| Field | Type | Required Column | Null Allowed | Description |
+| --- | --- | :---: | :---: | --- |
+| `vendor_id` | String | Yes | No* | Unique vendor identifier |
+| `vendor_name` | String | Yes | No* | Vendor or third-party name |
+| `service_type` | String | Yes | No* | Type of service provided by the vendor |
+| `critical_vendor` | Boolean | Yes | Yes | Whether the vendor is classified as critical |
+| `security_review_completed` | Boolean | Yes | Yes | Whether a documented security review has been completed |
+| `review_date` | String | Yes | Yes | Date associated with the documented security review |
+| `privileged_access` | Boolean | Yes | Yes | Whether the vendor has privileged access to organizational systems or resources |
+| `mfa_enabled` | Boolean | Yes | Yes | Whether MFA is enabled for the vendor's privileged access |
+
+\* Version 1 requires these columns to exist but does not currently perform explicit null-value validation on these descriptive vendor fields.
+
+The Third-Party Risk controls use different vendor attributes to determine scope:
+
+- **TPR-01** uses `critical_vendor` to determine scope and evaluates `security_review_completed` for critical vendors.
+- **TPR-02** uses `privileged_access` to determine scope and evaluates `mfa_enabled` for vendors with privileged access.
+
+For TPR-01, `review_date` is treated as supporting evidence only. The presence of a review date does not independently establish that a documented security review was completed. If `security_review_completed` is missing for a critical vendor, the record is classified as an evidence issue even when `review_date` contains a value.
+
+Similarly, a vendor confirmed not to have privileged access is outside the scope of TPR-02. A missing or false MFA value for that vendor does not create a TPR-02 control exception.
+
+#### Input Validation Summary
+
+Version 1 applies two levels of evidence handling:
+
+1. **Ingestion validation** verifies that all required columns are present and that validated fields contain supported values. Unsupported Boolean or employment-status values cause evidence loading to fail.
+
+2. **Control-specific assessment** determines whether individual records are in scope, whether sufficient evidence exists to assess them, and whether assessable records satisfy the applicable control requirement.
+
+This separation allows incomplete evidence to be processed when the missing information itself is relevant to the assessment, while preventing malformed or unsupported evidence values from silently affecting control results.
+
 ### Key Components
 
 - **`src/evidence.py`** — Loads evidence files and validates required schemas and supported values.
