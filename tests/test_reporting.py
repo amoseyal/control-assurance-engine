@@ -9,6 +9,7 @@ from src.reporting import (
     build_findings_dataframe,
     build_executive_summary,
     format_executive_summary,
+    format_executive_assessment,
     build_management_findings,
     format_management_findings,
     generate_management_report,
@@ -583,6 +584,39 @@ def test_format_executive_summary():
     assert '| Critical Findings | 0 |' in output
 
 
+def test_format_executive_assessment():
+    """
+    Test that executive-level assessment metrics are converted
+    into a concise narrative interpretation of the results.
+    """
+
+    # Create representative assessment metrics.
+    summary = {
+        'controls_assessed': 7,
+        'passed': 1,
+        'failed': 6,
+        'not_assessed': 0,
+        'total_exceptions': 9,
+        'evidence_issues': 7,
+        'high_findings': 6,
+        'critical_findings': 0
+    }
+
+    # Convert the structured metrics into an executive-level
+    # narrative assessment.
+    assessment = format_executive_assessment(summary)
+
+    # Verify that the narrative communicates the overall
+    # control-assessment result.
+    assert 'Six of seven controls evaluated' in assessment
+
+    # Verify that remediation significance is communicated.
+    assert 'confirmed exceptions requiring remediation' in assessment
+
+    # Verify that severity is summarized accurately.
+    assert 'No critical-severity findings were identified' in assessment
+    assert 'Six findings were rated High' in assessment
+
 
 # ------------------------------------------------------------
 # MANAGEMENT FINDINGS
@@ -768,6 +802,22 @@ def test_generate_management_report():
     assert '| Controls Evaluated | 3 |' in report
     assert '| Passed | 1 |' in report
     assert '| Failed | 2 |' in report
+
+    # Verify that the executive summary includes a narrative
+    # interpretation of the assessment results.
+    assert (
+        'Two of three controls evaluated resulted in confirmed '
+        'exceptions requiring remediation.'
+        in report
+    )
+
+    assert 'No critical-severity findings were identified.' in report
+
+    assert (
+        'Two findings were rated High based on the defined '
+        'Northstar BuildCo risk criteria.'
+        in report
+    )
 
     # Verify that remediation findings are included.
     assert '### IAM-01 | HIGH' in report

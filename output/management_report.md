@@ -19,6 +19,8 @@
 | High Findings | 6 |
 | Critical Findings | 0 |
 
+Six of seven controls evaluated resulted in confirmed exceptions requiring remediation. No critical-severity findings were identified. Six findings were rated High based on the defined Northstar BuildCo risk criteria.
+
 ## Findings Requiring Remediation
 
 ### IAM-01 | HIGH

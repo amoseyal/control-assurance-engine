@@ -355,6 +355,97 @@ def format_executive_summary(summary):
     return '\n'.join(lines)
 
 
+def format_executive_assessment(summary):
+    """
+    Convert executive-level assessment metrics into a concise
+    narrative interpretation for management.
+
+    Args:
+        summary:
+            Dictionary containing aggregated assessment metrics.
+
+    Returns:
+        str:
+            Executive-level narrative assessment of the results.
+    """
+
+    # Convert the small numeric values used in the assessment
+    # into words for more natural management-facing prose.
+    number_words = {
+        0: 'zero',
+        1: 'one',
+        2: 'two',
+        3: 'three',
+        4: 'four',
+        5: 'five',
+        6: 'six',
+        7: 'seven',
+        8: 'eight',
+        9: 'nine',
+        10: 'ten'
+    }
+
+    controls_assessed = summary['controls_assessed']
+    failed = summary['failed']
+    high_findings = summary['high_findings']
+    critical_findings = summary['critical_findings']
+
+    # Use words when the value is available in the small
+    # management-reporting range; otherwise fall back to the
+    # numeric value.
+    controls_text = number_words.get(
+        controls_assessed,
+        str(controls_assessed)
+    )
+
+    failed_text = number_words.get(
+        failed,
+        str(failed)
+    )
+
+    high_text = number_words.get(
+        high_findings,
+        str(high_findings)
+    )
+
+    # Capitalize the first number because it begins the
+    # executive assessment statement.
+    failed_text = failed_text.capitalize()
+
+    assessment_parts = [
+        (
+            f'{failed_text} of {controls_text} controls evaluated '
+            'resulted in confirmed exceptions requiring remediation.'
+        )
+    ]
+
+    # Describe critical-severity results without implying that
+    # the absence of Critical findings means the assessment is
+    # free of significant risk.
+    if critical_findings == 0:
+        assessment_parts.append(
+            'No critical-severity findings were identified.'
+        )
+    else:
+        critical_text = number_words.get(
+            critical_findings,
+            str(critical_findings)
+        )
+
+        assessment_parts.append(
+            f'{critical_text.capitalize()} findings were rated Critical.'
+        )
+
+    # Summarize High findings separately because they remain
+    # significant even when no Critical findings are present.
+    if high_findings > 0:
+        assessment_parts.append(
+            f'{high_text.capitalize()} findings were rated High '
+            'based on the defined Northstar BuildCo risk criteria.'
+        )
+
+    return ' '.join(assessment_parts)
+
 
 # ------------------------------------------------------------
 # MANAGEMENT FINDINGS
@@ -474,6 +565,12 @@ def generate_management_report(
         executive_summary
     )
 
+    # Convert the executive metrics into a concise narrative
+    # interpretation for management.
+    executive_assessment = format_executive_assessment(
+        executive_summary
+    )
+
     management_text = format_management_findings(
         management_findings
     )
@@ -516,6 +613,7 @@ def generate_management_report(
     report_sections.extend([
         '## Executive Summary',
         executive_text,
+        executive_assessment,
         '## Findings Requiring Remediation',
         management_text
     ])
