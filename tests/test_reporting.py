@@ -11,6 +11,8 @@ from src.reporting import (
     format_executive_summary,
     build_management_findings,
     format_management_findings,
+    generate_management_report,
+    export_management_report,
     export_findings_csv,
     format_control_finding
 )
@@ -563,25 +565,22 @@ def test_format_executive_summary():
         'critical_findings': 0
     }
 
-    # Format the structured metrics for management reporting.
+    # Format the structured metrics as a Markdown table.
     output = format_executive_summary(summary)
 
-    # Verify that the executive summary clearly communicates
-    # the overall assessment results.
-    assert 'Controls Evaluated: 7' in output
-    assert 'Passed: 1' in output
-    assert 'Failed: 6' in output
-    assert 'Not Assessed: 0' in output
+    # Verify the table structure.
+    assert '| Metric | Result |' in output
+    assert '| --- | ---: |' in output
 
-    # Verify that control exceptions and evidence-quality
-    # issues are reported separately.
-    assert 'Total Exceptions: 9' in output
-    assert 'Evidence Issues: 4' in output
-
-    # Verify that significant finding severities are summarized
-    # for management attention.
-    assert 'High Findings: 6' in output
-    assert 'Critical Findings: 0' in output
+    # Verify the executive metrics are represented correctly.
+    assert '| Controls Evaluated | 7 |' in output
+    assert '| Passed | 1 |' in output
+    assert '| Failed | 6 |' in output
+    assert '| Not Assessed | 0 |' in output
+    assert '| Total Exceptions | 9 |' in output
+    assert '| Evidence Issues | 4 |' in output
+    assert '| High Findings | 6 |' in output
+    assert '| Critical Findings | 0 |' in output
 
 
 
@@ -681,24 +680,135 @@ def test_format_management_findings():
     output = format_management_findings(management_findings)
 
     # Verify that each failed control and its severity are shown.
-    assert 'IAM-01 | HIGH' in output
-    assert 'TPR-02 | HIGH' in output
+    assert '### IAM-01 | HIGH' in output
+    assert '### TPR-02 | HIGH' in output
 
     # Verify that the affected entities are identified.
-    assert 'Affected: mlopez, snguyen' in output
-    assert 'Affected: VND-002' in output
+    assert '**Affected:** mlopez, snguyen' in output
+    assert '**Affected:** VND-002' in output
 
     # Verify that management receives both the finding context
     # and the recommended remediation action.
     assert (
-        'Active user accounts were identified without MFA enabled.'
+        '**Finding:** Active user accounts were identified without MFA enabled.'
         in output
     )
     assert (
-        'Recommendation: Enable MFA for all active user accounts '
+        '**Recommendation:** Enable MFA for all active user accounts '
         'and verify enrollment.'
         in output
     )
+
+
+
+# ------------------------------------------------------------
+# MANAGEMENT REPORT
+# ------------------------------------------------------------
+
+def test_generate_management_report():
+    """
+    Test that executive metrics and remediation findings are
+    assembled into a complete Markdown management report.
+    """
+
+    # Create representative executive-level assessment metrics.
+    executive_summary = {
+        'controls_assessed': 3,
+        'passed': 1,
+        'failed': 2,
+        'not_assessed': 0,
+        'total_exceptions': 3,
+        'evidence_issues': 1,
+        'high_findings': 2,
+        'critical_findings': 0
+    }
+
+    # Create representative failed controls requiring
+    # management remediation.
+    management_findings = [
+        {
+            'control_id': 'IAM-01',
+            'severity': 'HIGH',
+            'affected_entities': ['mlopez', 'snguyen'],
+            'finding_description': (
+                'Active user accounts were identified without MFA enabled.'
+            ),
+            'recommendation': (
+                'Enable MFA for all active user accounts and verify enrollment.'
+            )
+        },
+        {
+            'control_id': 'TPR-02',
+            'severity': 'HIGH',
+            'affected_entities': ['VND-002'],
+            'finding_description': (
+                'Third-party vendors with privileged access were identified '
+                'without MFA enabled.'
+            ),
+            'recommendation': (
+                'Require MFA for all third-party vendors with privileged access.'
+            )
+        }
+    ]
+
+    # Generate the Markdown management report.
+    report = generate_management_report(
+        executive_summary,
+        management_findings
+    )
+
+    # Verify the report identity and major sections.
+    assert '# Northstar BuildCo' in report
+    assert '## Cybersecurity Control Assurance Assessment' in report
+    assert '## Executive Summary' in report
+    assert '## Findings Requiring Remediation' in report
+
+    # Verify that calculated executive metrics are included
+    # using the Markdown table format.
+    assert '| Controls Evaluated | 3 |' in report
+    assert '| Passed | 1 |' in report
+    assert '| Failed | 2 |' in report
+
+    # Verify that remediation findings are included.
+    assert '### IAM-01 | HIGH' in report
+    assert '### TPR-02 | HIGH' in report
+    assert (
+        '**Recommendation:** Enable MFA for all active user accounts '
+        'and verify enrollment.'
+        in report
+    )
+
+
+def test_export_management_report(tmp_path):
+    """
+    Test that a generated Markdown management report is written
+    to the specified output file.
+    """
+
+    # Create representative Markdown report content.
+    report = (
+        '# Northstar BuildCo\n\n'
+        '## Cybersecurity Control Assurance Assessment\n\n'
+        '## Executive Summary\n\n'
+        'Controls Evaluated: 7'
+    )
+
+    # Use pytest's temporary directory so the test does not
+    # create or modify files in the real project output folder.
+    output_file = tmp_path / 'management_report.md'
+
+    # Export the generated management report.
+    export_management_report(
+        report,
+        output_file
+    )
+
+    # Verify that the report file was created.
+    assert output_file.exists()
+
+    # Verify that the exported file contains exactly the
+    # Markdown content supplied to the export function.
+    assert output_file.read_text() == report
 
 
 

@@ -324,7 +324,7 @@ def build_executive_summary(findings):
 def format_executive_summary(summary):
     """
     Convert structured executive-level assessment metrics into
-    concise, human-readable management output.
+    a Markdown table for management reporting.
 
     Args:
         summary:
@@ -332,27 +332,26 @@ def format_executive_summary(summary):
 
     Returns:
         str:
-            Formatted executive summary text.
+            Executive summary formatted as a Markdown table.
     """
 
-    # Build a concise management-level view of the assessment.
-    #
-    # Control results, confirmed exceptions, evidence-quality
-    # issues, and finding severity remain distinct so management
-    # can interpret each metric independently.
+    # Build a two-column Markdown table so the assessment metrics
+    # are easy to scan in management-facing reports.
     lines = [
-        f"Controls Evaluated: {summary['controls_assessed']}",
-        f"Passed: {summary['passed']}",
-        f"Failed: {summary['failed']}",
-        f"Not Assessed: {summary['not_assessed']}",
-        f"Total Exceptions: {summary['total_exceptions']}",
-        f"Evidence Issues: {summary['evidence_issues']}",
-        f"High Findings: {summary['high_findings']}",
-        f"Critical Findings: {summary['critical_findings']}"
+        '| Metric | Result |',
+        '| --- | ---: |',
+        f"| Controls Evaluated | {summary['controls_assessed']} |",
+        f"| Passed | {summary['passed']} |",
+        f"| Failed | {summary['failed']} |",
+        f"| Not Assessed | {summary['not_assessed']} |",
+        f"| Total Exceptions | {summary['total_exceptions']} |",
+        f"| Evidence Issues | {summary['evidence_issues']} |",
+        f"| High Findings | {summary['high_findings']} |",
+        f"| Critical Findings | {summary['critical_findings']} |"
     ]
 
-    # Join each metric on a separate line for readable
-    # console and report output.
+    # Join each table row with a newline to produce valid
+    # Markdown table syntax.
     return '\n'.join(lines)
 
 
@@ -394,7 +393,7 @@ def build_management_findings(findings):
 def format_management_findings(management_findings):
     """
     Convert failed control findings into a concise,
-    management-readable remediation summary.
+    management-readable Markdown remediation summary.
 
     Args:
         management_findings:
@@ -403,15 +402,15 @@ def format_management_findings(management_findings):
 
     Returns:
         str:
-            Formatted management findings summary.
+            Failed control findings formatted as Markdown.
     """
 
-    # Build a separate text block for each failed control.
     formatted_findings = []
 
     for finding in management_findings:
-        # Convert the affected-entity list into a readable
-        # comma-separated string.
+        # Convert the affected entity list into readable text.
+        # If no affected entities are present, explicitly show
+        # that none were identified.
         affected_entities = finding.get('affected_entities', [])
 
         if affected_entities:
@@ -419,20 +418,100 @@ def format_management_findings(management_findings):
         else:
             affected_text = 'None'
 
-        # Build the management-facing text for this finding.
+        # Render each failed control as its own Markdown subsection.
+        # Bold labels make the finding, affected population, and
+        # remediation recommendation easier for management to scan.
         lines = [
-            f"{finding['control_id']} | {finding['severity']}",
-            finding['finding_description'],
-            f"Affected: {affected_text}",
-            f"Recommendation: {finding['recommendation']}"
+            f"### {finding['control_id']} | {finding['severity']}",
+            '',
+            f"**Finding:** {finding['finding_description']}",
+            '',
+            f"**Affected:** {affected_text}",
+            '',
+            f"**Recommendation:** {finding['recommendation']}"
         ]
 
-        # Store the completed finding block.
+        # Store the completed findings block.
         formatted_findings.append('\n'.join(lines))
 
-    # Separate individual findings with a blank line so the
-    # remediation summary remains easy to scan.
+    # Separate individual control findings with blank lines.
     return '\n\n'.join(formatted_findings)
+
+
+
+# ------------------------------------------------------------
+# MANAGEMENT REPORT
+# ------------------------------------------------------------
+
+def generate_management_report(
+    executive_summary,
+    management_findings
+):
+    """
+    Generate a Markdown management report from executive-level
+    assessment metrics and confirmed remediation findings.
+
+    Args:
+        executive_summary:
+            Dictionary containing aggregated assessment metrics.
+
+        management_findings:
+            List of structured findings for controls with
+            confirmed FAIL results.
+
+    Returns:
+        str:
+            Complete management report formatted as Markdown.
+    """
+
+    # Reuse the existing formatters so executive metrics and
+    # remediation findings remain consistent across console
+    # output and the generated management report.
+    executive_text = format_executive_summary(
+        executive_summary
+    )
+
+    management_text = format_management_findings(
+        management_findings
+    )
+
+    # Assemble the management-facing sections into a single
+    # Markdown document.
+    report_sections = [
+        '# Northstar BuildCo',
+        '## Cybersecurity Control Assurance Assessment',
+        '## Executive Summary',
+        executive_text,
+        '## Findings Requiring Remediation',
+        management_text
+    ]
+
+    # Separate report sections with blank lines to produce
+    # readable Markdown output.
+    return '\n\n'.join(report_sections)
+
+
+def export_management_report(report, filepath):
+    """
+    Export a generated Markdown management report to a file.
+
+    Args:
+        report:
+            String containing the complete Markdown report.
+
+        filepath:
+            Path where the management report should be written.
+
+    Returns:
+        None
+    """
+
+    # Write the generated Markdown report to the specified
+    # output file using UTF-8 encoding.
+    filepath.write_text(
+        report,
+        encoding='utf-8'
+    )
 
 
 

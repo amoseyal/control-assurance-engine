@@ -28,6 +28,8 @@ from src.reporting import (
     format_executive_summary,
     build_management_findings,
     format_management_findings,
+    generate_management_report,
+    export_management_report,
     build_findings_dataframe,
     export_findings_csv
 )
@@ -47,6 +49,9 @@ VENDOR_EVIDENCE_FILE = Path('data/vendors.csv')
 
 # Define the location for the consolidated control-findings report.
 CONTROL_FINDINGS_FILE = Path('output/control_findings.csv')
+
+# Management-facing Markdown assessment report.
+MANAGEMENT_REPORT_FILE = Path('output/management_report.md')
 
 
 def main():
@@ -447,7 +452,6 @@ def main():
         CONTROL_FINDINGS_FILE
     )
 
-
     # Build a remediation-focused management view containing only
     # confirmed control failures.
     management_findings = build_management_findings(all_findings)
@@ -456,6 +460,20 @@ def main():
     print('\n## Findings Requiring Remediation')
     print('---------------------------------')
     print(format_management_findings(management_findings))
+
+    # Generate a complete management-facing Markdown report using
+    # the executive summary and confirmed remediation findings.
+    management_report = generate_management_report(
+        executive_summary,
+        management_findings
+    )
+
+    # Export the completed management report as a persistent
+    # Markdown deliverable.
+    export_management_report(
+        management_report,
+        MANAGEMENT_REPORT_FILE
+    )
 
 
 
