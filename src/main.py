@@ -53,6 +53,17 @@ CONTROL_FINDINGS_FILE = Path('output/control_findings.csv')
 # Management-facing Markdown assessment report.
 MANAGEMENT_REPORT_FILE = Path('output/management_report.md')
 
+# Management report context for the Northstar BuildCo
+# cybersecurity control assurance assessment.
+ASSESSMENT_DATE = 'October 2026'
+
+ASSESSMENT_SCOPE = (
+    'Identity and Access Management, Endpoint Security, '
+    'and Third-Party Risk'
+)
+
+FRAMEWORK_ALIGNMENT = 'NIST Cybersecurity Framework (CSF) 2.0'
+
 
 def main():
     """
@@ -461,11 +472,14 @@ def main():
     print('---------------------------------')
     print(format_management_findings(management_findings))
 
-    # Generate a complete management-facing Markdown report using
-    # the executive summary and confirmed remediation findings.
+    # Generate the management-facing report with assessment
+    # context, executive metrics, and remediation findings.
     management_report = generate_management_report(
         executive_summary,
-        management_findings
+        management_findings,
+        assessment_date=ASSESSMENT_DATE,
+        assessment_scope=ASSESSMENT_SCOPE,
+        framework_alignment=FRAMEWORK_ALIGNMENT
     )
 
     # Export the completed management report as a persistent

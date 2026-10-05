@@ -779,6 +779,57 @@ def test_generate_management_report():
     )
 
 
+def test_generate_management_report_includes_assessment_context():
+    """
+    Test that the management report includes basic assessment
+    context before presenting assessment results.
+    """
+
+    # Create representative executive-level assessment metrics.
+    executive_summary = {
+        'controls_assessed': 3,
+        'passed': 1,
+        'failed': 2,
+        'not_assessed': 0,
+        'total_exceptions': 3,
+        'evidence_issues': 1,
+        'high_findings': 2,
+        'critical_findings': 0
+    }
+
+    # No remediation findings are required to test the
+    # assessment-context section itself.
+    management_findings = []
+
+    # Generate the management report with assessment context.
+    report = generate_management_report(
+        executive_summary,
+        management_findings,
+        assessment_date='October 2026',
+        assessment_scope=(
+            'Identity and Access Management, Endpoint Security, '
+            'and Third-Party Risk'
+        ),
+        framework_alignment='NIST Cybersecurity Framework (CSF) 2.0'
+    )
+
+    # Verify that the assessment context is presented near
+    # the beginning of the management report.
+    assert '**Assessment Date:** October 2026' in report
+
+    assert (
+        '**Assessment Scope:** Identity and Access Management, '
+        'Endpoint Security, and Third-Party Risk'
+        in report
+    )
+
+    assert (
+        '**Framework Alignment:** '
+        'NIST Cybersecurity Framework (CSF) 2.0'
+        in report
+    )
+
+
 def test_export_management_report(tmp_path):
     """
     Test that a generated Markdown management report is written

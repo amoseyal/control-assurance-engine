@@ -445,7 +445,10 @@ def format_management_findings(management_findings):
 
 def generate_management_report(
     executive_summary,
-    management_findings
+    management_findings,
+    assessment_date=None,
+    assessment_scope=None,
+    framework_alignment=None
 ):
     """
     Generate a Markdown management report from executive-level
@@ -475,16 +478,47 @@ def generate_management_report(
         management_findings
     )
 
+    # Build optional assessment context for the management report.
+    # Each field is included only when a value is provided so the
+    # report generator remains compatible with simpler use cases.
+    context_lines = []
+
+    if assessment_date:
+        context_lines.append(
+            f'**Assessment Date:** {assessment_date}'
+        )
+
+    if assessment_scope:
+        context_lines.append(
+            f'**Assessment Scope:** {assessment_scope}'
+        )
+
+    if framework_alignment:
+        context_lines.append(
+            f'**Framework Alignment:** {framework_alignment}'
+        )
+
+    # Separate each context item with a Markdown line break.
+    assessment_context = '  \n'.join(context_lines)
+
     # Assemble the management-facing sections into a single
     # Markdown document.
     report_sections = [
         '# Northstar BuildCo',
-        '## Cybersecurity Control Assurance Assessment',
+        '## Cybersecurity Control Assurance Assessment'
+    ]
+
+    # Include assessment context when one or more context
+    # fields were supplied.
+    if assessment_context:
+        report_sections.append(assessment_context)
+
+    report_sections.extend([
         '## Executive Summary',
         executive_text,
         '## Findings Requiring Remediation',
         management_text
-    ]
+    ])
 
     # Separate report sections with blank lines to produce
     # readable Markdown output.
