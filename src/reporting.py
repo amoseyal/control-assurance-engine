@@ -716,3 +716,112 @@ def export_findings_csv(findings_dataframe, output_file):
         output_file,
         index=False
     )
+
+
+
+# ============================================================
+# HTML MANAGEMENT REPORT GENERATOR
+# ============================================================
+
+def format_html_report(findings):
+    """
+    Format control-assurance findings as an HTML management report.
+
+    This function is responsible only for presentation. It does not
+    recalculate control results, exception rates, risk scores, or severity.
+    Those values come from the completed assessment findings and the
+    existing executive-summary aggregation logic.
+
+    Args:
+        findings:
+            List of structured control finding dictionaries.
+
+    Returns:
+        str:
+            A complete HTML document representing the management report.
+    """
+
+    # Reuse the existing executive-summary logic so the HTML and
+    # Markdown reports are based on the same assessment metrics.
+    summary = build_executive_summary(findings)
+
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Control Assurance Engine | Management Report</title>
+</head>
+
+<body>
+    <main>
+        <header>
+            <h1>Control Assurance Engine</h1>
+            <h2>Northstar BuildCo — Management Assessment Report</h2>
+        </header>
+
+        <section>
+            <h2>Executive Summary</h2>
+
+            <div class="metrics">
+                <div class="metric">
+                    <span class="metric-value">
+                        {summary['controls_assessed']}
+                    </span>
+                    <span class="metric-label">Controls Evaluated</span>
+                </div>
+
+                <div class="metric">
+                    <span class="metric-value">
+                        {summary['passed']}
+                    </span>
+                    <span class="metric-label">Passed</span>
+                </div>
+
+                <div class="metric">
+                    <span class="metric-value">
+                        {summary['failed']}
+                    </span>
+                    <span class="metric-label">Failed</span>
+                </div>
+
+                <div class="metric">
+                    <span class="metric-value">
+                        {summary['not_assessed']}
+                    </span>
+                    <span class="metric-label">Not Assessed</span>
+                </div>
+
+                <div class="metric">
+                    <span class="metric-value">
+                        {summary['total_exceptions']}
+                    </span>
+                    <span class="metric-label">Total Exceptions</span>
+                </div>
+
+                <div class="metric">
+                    <span class="metric-value">
+                        {summary['evidence_issues']}
+                    </span>
+                    <span class="metric-label">Evidence Issues</span>
+                </div>
+
+                <div class="metric">
+                    <span class="metric-value">
+                        {summary['high_findings']}
+                    </span>
+                    <span class="metric-label">High Findings</span>
+                </div>
+
+                <div class="metric">
+                    <span class="metric-value">
+                        {summary['critical_findings']}
+                    </span>
+                    <span class="metric-label">Critical Findings</span>
+                </div>
+            </div>
+        </section>
+    </main>
+</body>
+</html>
+"""

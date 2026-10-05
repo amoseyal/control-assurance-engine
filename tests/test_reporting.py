@@ -15,7 +15,8 @@ from src.reporting import (
     generate_management_report,
     export_management_report,
     export_findings_csv,
-    format_control_finding
+    format_control_finding,
+    format_html_report
 )
 
 
@@ -970,3 +971,69 @@ def test_export_findings_csv(tmp_path):
         'FAIL',
         'PASS'
     ]
+
+
+
+# ============================================================
+# HTML MANAGEMENT REPORT TESTS
+# ============================================================
+
+
+def test_format_html_report_returns_complete_html_document():
+    """HTML management report should return a complete HTML document."""
+
+    # The initial HTML formatter does not yet use finding data,
+    # so an empty list is sufficient for this structural test.
+    report = format_html_report([])
+
+    # Verify the basic HTML document structure and report identity.
+    assert '<!DOCTYPE html>' in report
+    assert '<html lang="en">' in report
+    assert '<title>Control Assurance Engine | Management Report</title>' in report
+    assert '<h1>Control Assurance Engine</h1>' in report
+    assert 'Northstar BuildCo' in report
+    assert '</html>' in report
+
+
+def test_format_html_report_uses_executive_summary_metrics():
+    """HTML report should display metrics derived from control findings."""
+
+    # Create representative findings containing the fields required
+    # by the existing executive-summary aggregation function.
+    findings = [
+        {
+            'result': 'PASS',
+            'exception_count': 0,
+            'evidence_issue_count': 1,
+            'severity': None
+        },
+        {
+            'result': 'FAIL',
+            'exception_count': 2,
+            'evidence_issue_count': 1,
+            'severity': 'HIGH'
+        }
+    ]
+
+    report = format_html_report(findings)
+
+    # Verify that aggregated assessment values appear alongside
+    # their corresponding management-report labels.
+    assert '2' in report
+    assert 'Controls Evaluated' in report
+
+    assert '1' in report
+    assert 'Passed' in report
+    assert 'Failed' in report
+
+    assert '2' in report
+    assert 'Total Exceptions' in report
+
+    assert '2' in report
+    assert 'Evidence Issues' in report
+
+    assert '1' in report
+    assert 'High Findings' in report
+
+    assert '0' in report
+    assert 'Critical Findings' in report
