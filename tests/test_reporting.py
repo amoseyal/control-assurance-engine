@@ -16,7 +16,12 @@ from src.reporting import (
     export_management_report,
     export_findings_csv,
     format_control_finding,
-    format_html_report
+    format_html_report,
+    format_html_control_results,
+    format_html_management_findings,
+    format_html_control_outcomes,
+    format_html_finding_severity,
+    format_html_evidence_comparison
 )
 
 
@@ -1002,18 +1007,53 @@ def test_format_html_report_uses_executive_summary_metrics():
     # by the existing executive-summary aggregation function.
     findings = [
         {
+            'control_id': 'END-02',
+            'requirement': (
+                'Company-managed endpoints must have endpoint '
+                'protection enabled.'
+            ),
+            'nist_csf_subcategory': 'PR.PS-05',
             'result': 'PASS',
+            'population_tested': 7,
             'exception_count': 0,
-            'evidence_issue_count': 1,
+            'exception_rate': 0.0,
+            'evidence_issue_count': 0,
+            'risk_score': None,
             'severity': None
         },
         {
+            'control_id': 'IAM-01',
+            'requirement': 'All active user accounts must have MFA enabled.',
+            'nist_csf_subcategory': 'PR.AA-03',
             'result': 'FAIL',
+            'population_tested': 8,
             'exception_count': 2,
-            'evidence_issue_count': 1,
-            'severity': 'HIGH'
+            'exception_rate': 25.0,
+            'evidence_issue_count': 2,
+            'risk_score': 16,
+            'severity': 'HIGH',
+
+            # Remediation details used by the management-findings section.
+            'finding_description': (
+                'Active user accounts were identified without MFA enabled.'
+            ),
+            'affected_entities': ['mlopez', 'jparis'],
+            'recommendation': (
+                'Enable MFA for all active user accounts and verify enrollment.'
+            ),
         }
     ]
+
+    # Generate the complete HTML report from the representative findings.
+    report = format_html_report(findings)
+
+    # Verify that the complete report also incorporates the
+    # detailed control-results section.
+    assert '<h2>Control Results</h2>' in report
+    assert 'END-02' in report
+    assert 'IAM-01' in report
+    assert 'PR.PS-05' in report
+    assert 'PR.AA-03' in report
 
     report = format_html_report(findings)
 
@@ -1037,3 +1077,191 @@ def test_format_html_report_uses_executive_summary_metrics():
 
     assert '0' in report
     assert 'Critical Findings' in report
+
+
+def test_format_html_control_results_pass_has_no_active_risk():
+    """PASS controls should not be assigned an active risk severity or score."""
+
+    # A passing control has no confirmed control exception and
+    # therefore no active risk severity or risk score.
+    findings = [
+        {
+            'control_id': 'END-02',
+            'requirement': (
+                'Company-managed endpoints must have endpoint '
+                'protection enabled.'
+            ),
+            'nist_csf_subcategory': 'PR.PS-05',
+            'result': 'PASS',
+            'population_tested': 7,
+            'exception_count': 0,
+            'exception_rate': 0.0,
+            'evidence_issue_count': 0,
+            'risk_score': None,
+            'severity': None
+        }
+    ]
+
+    report = format_html_control_results(findings)
+
+    # Verify the control is correctly presented as passing.
+    assert 'END-02' in report
+    assert 'PASS' in report
+    assert 'PR.PS-05' in report
+
+    # Severity and risk score should be represented as unavailable,
+    # rather than incorrectly implying that PASS equals LOW risk.
+    assert report.count('N/A') == 2
+
+
+def test_format_html_control_results_includes_control_data():
+    """HTML control results should display assessment and risk data."""
+
+    # Create one representative failed control finding using the
+    # same fields produced by the control-assessment pipeline.
+    findings = [
+        {
+            'control_id': 'IAM-01',
+            'requirement': 'All active user accounts must have MFA enabled.',
+            'nist_csf_subcategory': 'PR.AA-03',
+            'result': 'FAIL',
+            'population_tested': 8,
+            'exception_count': 3,
+            'exception_rate': 37.5,
+            'evidence_issue_count': 2,
+            'risk_score': 16,
+            'severity': 'HIGH'
+        }
+    ]
+
+    report = format_html_control_results(findings)
+
+    # Verify that the control identity and requirement are present.
+    assert 'IAM-01' in report
+    assert 'All active user accounts must have MFA enabled.' in report
+
+    # Verify that assessment and framework information is present.
+    assert 'FAIL' in report
+    assert 'HIGH' in report
+    assert 'PR.AA-03' in report
+
+    # Verify that the calculated control metrics are presented.
+    assert '37.5%' in report
+    assert 'Population Tested' in report
+    assert 'Exceptions' in report
+    assert 'Evidence Issues' in report
+    assert 'Risk Score' in report
+
+
+def test_format_html_management_findings_includes_remediation_details():
+    """HTML management findings should include actionable remediation data."""
+    management_findings = [
+        {
+            'control_id': 'IAM-01',
+            'severity': 'HIGH',
+            'finding_description': (
+                'Active user accounts were identified without MFA enabled.'
+            ),
+            'affected_entities': ['mlopez', 'jparis'],
+            'recommendation': (
+                'Enable MFA for all active user accounts and verify enrollment.'
+            )
+        }
+    ]
+
+    report = format_html_management_findings(management_findings)
+
+    assert 'IAM-01' in report
+    assert 'HIGH' in report
+    assert 'Active user accounts were identified without MFA enabled.' in report
+    assert 'mlopez, jparis' in report
+    assert 'Enable MFA for all active user accounts' in report
+    assert 'Finding' in report
+    assert 'Affected' in report
+    assert 'Recommendation' in report
+
+
+def test_format_html_control_outcomes_uses_summary_metrics():
+    """Control-outcome visual should use existing executive metrics."""
+    summary = {
+        'controls_assessed': 7,
+        'passed': 1,
+        'failed': 6,
+        'not_assessed': 0
+    }
+
+    report = format_html_control_outcomes(summary)
+
+    assert 'Control Outcomes' in report
+    assert 'Passed' in report
+    assert 'Failed' in report
+    assert 'Not Assessed' in report
+    assert 'width: 14.3%' in report
+    assert 'width: 85.7%' in report
+    assert 'width: 0.0%' in report
+
+
+def test_format_html_finding_severity_uses_summary_metrics():
+    """Finding-severity visual should use existing severity metrics."""
+    summary = {
+        'high_findings': 6,
+        'critical_findings': 0
+    }
+
+    report = format_html_finding_severity(summary)
+
+    assert 'Finding Severity' in report
+    assert 'High' in report
+    assert 'Critical' in report
+    assert 'width: 100.0%' in report
+    assert 'width: 0.0%' in report
+
+
+def test_format_html_evidence_comparison_uses_finding_counts():
+    """Evidence comparison should preserve exception and evidence counts."""
+    findings = [
+        {
+            'control_id': 'IAM-01',
+            'exception_count': 3,
+            'evidence_issue_count': 2
+        },
+        {
+            'control_id': 'IAM-02',
+            'exception_count': 1,
+            'evidence_issue_count': 0
+        }
+    ]
+
+    report = format_html_evidence_comparison(findings)
+
+    assert 'Exceptions vs. Evidence Issues by Control' in report
+    assert 'IAM-01' in report
+    assert 'IAM-02' in report
+    assert 'Exceptions' in report
+    assert 'Evidence Issues' in report
+
+    # Bars are normalized to the largest count in the findings.
+    assert 'width: 100.0%' in report
+    assert 'width: 66.7%' in report
+    assert 'width: 33.3%' in report
+    assert 'width: 0.0%' in report
+
+
+def test_format_html_report_includes_assessment_context():
+    """HTML management report should include assessment context."""
+    report = format_html_report(
+        [],
+        assessment_date='October 2026',
+        assessment_scope=(
+            'Identity and Access Management, Endpoint Security, '
+            'and Third-Party Risk'
+        ),
+        framework_alignment='NIST Cybersecurity Framework (CSF) 2.0'
+    )
+
+    assert 'October 2026' in report
+    assert (
+        'Identity and Access Management, Endpoint Security, '
+        'and Third-Party Risk'
+    ) in report
+    assert 'NIST Cybersecurity Framework (CSF) 2.0' in report

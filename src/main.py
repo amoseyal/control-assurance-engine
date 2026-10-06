@@ -1,4 +1,5 @@
 from pathlib import Path
+from datetime import datetime
 
 # Import the evidence loaders responsible for reading and validating
 # Northstar's user-account and endpoint evidence.
@@ -31,7 +32,8 @@ from src.reporting import (
     generate_management_report,
     export_management_report,
     build_findings_dataframe,
-    export_findings_csv
+    export_findings_csv,
+    format_html_report,
 )
 
 # Import the centralized control metadata catalog.
@@ -53,9 +55,18 @@ CONTROL_FINDINGS_FILE = Path('output/control_findings.csv')
 # Management-facing Markdown assessment report.
 MANAGEMENT_REPORT_FILE = Path('output/management_report.md')
 
-# Management report context for the Northstar BuildCo
-# cybersecurity control assurance assessment.
-ASSESSMENT_DATE = 'October 2026'
+# Browser-based management report used for enhanced
+# presentation and visual reporting.
+HTML_MANAGEMENT_REPORT_FILE = Path('output/management_report.html')
+
+# Record the date on which the assessment is executed.
+# Building the string manually avoids platform-specific strftime
+# directives for displaying the day without a leading zero.
+today = datetime.now()
+
+ASSESSMENT_DATE = (
+    f'{today.strftime("%B")} {today.day}, {today.year}'
+)
 
 ASSESSMENT_SCOPE = (
     'Identity and Access Management, Endpoint Security, '
@@ -487,6 +498,23 @@ def main():
     export_management_report(
         management_report,
         MANAGEMENT_REPORT_FILE
+    )
+
+    # Generate the browser-based HTML report using the complete
+    # assessment findings and the same assessment context used
+    # by the Markdown management report.
+    html_management_report = format_html_report(
+        all_findings,
+        assessment_date=ASSESSMENT_DATE,
+        assessment_scope=ASSESSMENT_SCOPE,
+        framework_alignment=FRAMEWORK_ALIGNMENT
+    )
+
+    # Export the HTML report using the same format-neutral
+    # management-report export function.
+    export_management_report(
+        html_management_report,
+        HTML_MANAGEMENT_REPORT_FILE
     )
 
 
