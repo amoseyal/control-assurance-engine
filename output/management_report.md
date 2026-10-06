@@ -2,8 +2,8 @@
 
 ## Cybersecurity Control Assurance Assessment
 
-**Assessment Date:** October 2026  
-**Assessment Scope:** Identity and Access Management, Endpoint Security, and Third-Party Risk  
+**Assessment Date:** October 5, 2026
+**Assessment Scope:** Identity and Access Management, Endpoint Security, and Third-Party Risk
 **Framework Alignment:** NIST Cybersecurity Framework (CSF) 2.0
 
 ## Executive Summary
