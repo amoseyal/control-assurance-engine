@@ -65,6 +65,10 @@ Evidence issues are tracked independently from the control result. For example, 
 
 Running the assessment produces three complementary deliverables.
 
+**[View the Live Management Report](https://amoseyal.github.io/control-assurance-engine/)**
+
+The live report provides a browser-based view of the synthetic Northstar BuildCo assessment, including executive metrics, visual analysis, detailed control results, and remediation-focused findings.
+
 ### Structured Findings
 
 [`output/control_findings.csv`](output/control_findings.csv) contains the structured results of the control assessment for further analysis, filtering, or integration with other reporting workflows.
