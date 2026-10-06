@@ -34,7 +34,7 @@ Risk Scoring & Severity
       ↓
 Executive & Remediation Reporting
       ↓
-CSV and Markdown Outputs
+CSV, Markdown, and HTML Outputs
 ```
 
 ## Assessment Scope & Controls
@@ -63,7 +63,7 @@ Evidence issues are tracked independently from the control result. For example, 
 
 ## Outputs & Example Results
 
-Running the assessment produces two complementary deliverables.
+Running the assessment produces three complementary deliverables.
 
 ### Structured Findings
 
@@ -82,16 +82,31 @@ The output includes information such as:
 - risk score and severity, and
 - management-oriented finding and remediation information.
 
-### Management Report
+### Markdown Management Report
 
-[`output/management_report.md`](output/management_report.md) converts the structured assessment results into a management-facing cybersecurity control assurance report.
+[`output/management_report.md`](output/management_report.md) converts the structured assessment results into a concise management-facing cybersecurity control assurance report.
 
-The report includes:
+The Markdown report includes:
 
-- assessment scope and framework alignment,
+- assessment date, scope, and framework alignment,
 - executive-level assessment metrics,
 - a narrative interpretation of the results, and
 - remediation-focused findings for confirmed control failures.
+
+### HTML Management Report
+
+[`output/management_report.html`](output/management_report.html) provides an enhanced browser-based management report generated from the same structured control-assessment findings.
+
+The HTML report includes:
+
+- automatically generated assessment date, scope, and framework alignment,
+- executive-level assessment metrics,
+- visual analysis of control outcomes and active finding severity,
+- a control-by-control comparison of confirmed exceptions and evidence-quality issues,
+- detailed results for all evaluated controls, and
+- remediation-focused findings and recommendations for confirmed control failures.
+
+The HTML reporting layer does not recalculate control results, evidence classifications, or risk. It consumes the structured findings produced by the assessment engine so that the Markdown, CSV, and HTML outputs remain based on the same underlying assessment logic.
 
 ### Sample Assessment Results
 
@@ -319,11 +334,13 @@ This separation allows assessment logic to be tested independently from presenta
 
 ### 9. Reporting Serves Different Audiences
 
-The engine produces both structured and management-facing outputs.
+The engine produces structured, analytical, and management-facing outputs.
 
-`control_findings.csv` preserves detailed assessment data for analysis and downstream processing, while `management_report.md` presents executive metrics and confirmed remediation findings in a more concise format.
+`control_findings.csv` preserves detailed assessment data for analysis and downstream processing. `management_report.md` provides a concise text-based management report, while `management_report.html` provides an enhanced browser-based report with executive metrics, visual analysis, detailed control results, and remediation-focused findings.
 
-This avoids forcing one report format to serve both technical analysis and management communication.
+All reporting formats consume the same structured assessment findings rather than independently recalculating control results or risk.
+
+This allows the engine to support technical analysis and management communication without forcing a single report format to serve both purposes.
 
 ## Project Structure
 
@@ -335,7 +352,8 @@ control-assurance-engine/
 │   └── vendors.csv
 ├── output/
 │   ├── control_findings.csv
-│   └── management_report.md
+│   ├── management_report.md
+│   └── management_report.html
 ├── src/
 │   ├── control_catalog.py
 │   ├── controls.py
@@ -453,7 +471,7 @@ This separation allows incomplete evidence to be processed when the missing info
 - **`src/controls.py`** — Contains control-specific scope, assessability, and exception logic.
 - **`src/control_catalog.py`** — Defines control requirements, evidence sources, NIST CSF 2.0 mappings, risk assumptions, finding descriptions, and remediation recommendations.
 - **`src/risk.py`** — Calculates likelihood × impact risk scores and classifies finding severity.
-- **`src/reporting.py`** — Builds structured findings, executive metrics, remediation views, and report outputs.
+- **`src/reporting.py`** — Builds structured findings, executive metrics, remediation views, and Markdown and HTML management reporting, including visual analysis of control outcomes, finding severity, exceptions, and evidence issues.
 - **`src/main.py`** — Orchestrates the end-to-end assessment workflow.
 - **`tests/`** — Automated tests covering evidence validation, control logic, catalog metadata, risk calculations, and reporting behavior.
 
@@ -479,12 +497,13 @@ From the project root:
 python -m src.main
 ```
 
-The assessment reads the sample evidence in `data/`, evaluates the seven controls, displays assessment results, and generates two persistent reporting artifacts:
+The assessment reads the sample evidence in `data/`, evaluates the seven controls, displays assessment results, and generates three persistent reporting artifacts:
 
 ```text
 output/
 ├── control_findings.csv
-└── management_report.md
+├── management_report.md
+└── management_report.html
 ```
 
 ### Run the Automated Tests
@@ -495,7 +514,7 @@ Run the complete test suite with:
 python -m pytest -v
 ```
 
-The project currently includes **74 automated tests** covering the assessment pipeline, including:
+The project currently includes **83 automated tests** covering the assessment pipeline and reporting layer, including:
 
 - evidence schema and value validation,
 - control scope and assessability,
@@ -507,7 +526,7 @@ The project currently includes **74 automated tests** covering the assessment pi
 - risk scoring and severity,
 - executive-summary calculations,
 - management-report generation, and
-- CSV and Markdown exports.
+- CSV, Markdown, and HTML report generation and export.
 
 ## Limitations & Future Development
 
@@ -543,10 +562,10 @@ Future versions could extend the architecture to support:
 - evidence provenance and collection metadata,
 - additional cybersecurity framework mappings,
 - configurable reporting for different stakeholders,
-- dashboards and visualization of control performance, and
+- interactive dashboards and historical control-performance visualization, and
 - continuous or scheduled control monitoring.
 
-These enhancements are intentionally outside the scope of version 1. The current project focuses on demonstrating a defensible control-assessment workflow, clear separation of evidence issues from confirmed exceptions, structured risk evaluation, and automated reporting.
+These enhancements are intentionally outside the current project scope. The project focuses on demonstrating a defensible control-assessment workflow, clear separation of evidence issues from confirmed exceptions, structured risk evaluation, and automated reporting.
 
 ## Skills Demonstrated
 
@@ -565,7 +584,7 @@ This project demonstrates the application of cybersecurity GRC concepts through 
 - structured data processing with pandas,
 - modular software design,
 - automated testing with pytest, and
-- CSV and Markdown report generation.
+- CSV, Markdown, and HTML report generation with management-focused visual analysis.
 
 The project is intended to demonstrate how cybersecurity governance and assurance concepts can be translated into repeatable, testable technical workflows.
 
