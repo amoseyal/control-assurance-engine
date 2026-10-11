@@ -1,3 +1,5 @@
+from html import escape
+
 import pandas as pd
 
 # Import the centralized risk-scoring functions so that
@@ -726,6 +728,27 @@ def export_findings_csv(findings_dataframe, output_file):
 # HTML MANAGEMENT REPORT GENERATOR
 # ============================================================
 
+def escape_html(value):
+    """
+    Escape a value for safe insertion into HTML text or
+    quoted HTML attributes.
+
+    Converts the supplied value to a string and escapes
+    HTML-sensitive characters, including ampersands,
+    angle brackets, and quotation marks.
+
+    Args:
+        value:
+            Value to be inserted into generated HTML.
+
+    Returns:
+        str:
+            HTML-escaped string safe for insertion into
+            HTML text or quoted attribute values.
+    """
+    return escape(str(value), quote=True)
+
+
 def format_html_control_results(findings):
     """
     Format all control-assessment findings as HTML result cards.
@@ -749,22 +772,28 @@ def format_html_control_results(findings):
         # Risk information is only active for failed controls.
         # PASS and NOT ASSESSED findings may therefore have no
         # severity or risk score.
-        severity = finding.get('severity') or 'N/A'
-        risk_score = finding.get('risk_score')
+        severity = finding.get("severity") or "N/A"
+        risk_score = finding.get("risk_score")
 
-        # Convert assessment values into CSS-safe class names.
-        # These classes affect presentation only; they do not
-        # change the underlying control result or risk severity.
-        result_class = finding['result'].lower().replace(' ', '-')
+        # Restrict CSS classes to known assessment values.
+        # Unexpected values use a neutral class rather than
+        # being inserted directly into HTML attributes.
+        result_classes = {
+            "PASS": "pass",
+            "FAIL": "fail",
+            "NOT ASSESSED": "not-assessed",
+        }
 
-        severity_value = finding.get('severity')
-        if severity_value is None:
-            severity_class = 'none'
-        else:
-            severity_class = severity_value.lower()
+        severity_classes = {"HIGH": "high", "CRITICAL": "critical"}
+
+        result_class = result_classes.get(str(finding["result"]).upper(), "unknown")
+
+        severity_class = severity_classes.get(
+            str(finding.get("severity")).upper(), "none"
+        )
 
         if risk_score is None:
-            risk_score_text = 'N/A'
+            risk_score_text = "N/A"
         else:
             risk_score_text = str(risk_score)
 
@@ -773,52 +802,52 @@ def format_html_control_results(findings):
         card = f"""
             <article class="control-card control-{result_class}">
                 <div class="control-card-header">
-                    <h3>{finding['control_id']}</h3>
+                    <h3>{escape_html(finding['control_id'])}</h3>
 
                     <div class="control-status">
                         <span class="result-badge result-{result_class}">
-                            {finding['result']}
+                            {escape_html(finding['result'])}
                         </span>
 
                         <span class="severity-badge severity-{severity_class}">
-                            {severity}
+                            {escape_html(severity)}
                         </span>
                     </div>
                 </div>
 
                 <p class="control-requirement">
-                    {finding['requirement']}
+                    {escape_html(finding['requirement'])}
                 </p>
 
                 <dl class="control-metrics">
                     <div>
                         <dt>NIST CSF</dt>
-                        <dd>{finding['nist_csf_subcategory']}</dd>
+                        <dd>{escape_html(finding['nist_csf_subcategory'])}</dd>
                     </div>
 
                     <div>
                         <dt>Population Tested</dt>
-                        <dd>{finding['population_tested']}</dd>
+                        <dd>{escape_html(finding['population_tested'])}</dd>
                     </div>
 
                     <div>
                         <dt>Exceptions</dt>
-                        <dd>{finding['exception_count']}</dd>
+                        <dd>{escape_html(finding['exception_count'])}</dd>
                     </div>
 
                     <div>
                         <dt>Exception Rate</dt>
-                        <dd>{finding['exception_rate']}%</dd>
+                        <dd>{escape_html(finding['exception_rate'])}%</dd>
                     </div>
 
                     <div>
                         <dt>Evidence Issues</dt>
-                        <dd>{finding['evidence_issue_count']}</dd>
+                        <dd>{escape_html(finding['evidence_issue_count'])}</dd>
                     </div>
 
                     <div>
                         <dt>Risk Score</dt>
-                        <dd>{risk_score_text}</dd>
+                        <dd>{escape_html(risk_score_text)}</dd>
                     </div>
                 </dl>
             </article>
@@ -827,7 +856,7 @@ def format_html_control_results(findings):
         control_cards.append(card)
 
     # Combine all control cards into one HTML block.
-    return '\n'.join(control_cards)
+    return "\n".join(control_cards)
 
 
 def format_html_management_findings(management_findings):
@@ -850,22 +879,31 @@ def format_html_management_findings(management_findings):
 
     for finding in management_findings:
         # Present affected entities as a readable comma-separated list.
-        affected_entities = ', '.join(finding['affected_entities'])
+        # Escape each affected entity before combining them.
+        # This prevents entity names from introducing HTML markup.
+        affected_entities = ", ".join(
+            escape_html(entity) for entity in finding["affected_entities"]
+        )
+
+        # Restrict severity CSS classes to known values.
+        severity_classes = {"HIGH": "high", "CRITICAL": "critical"}
+
+        severity_class = severity_classes.get(str(finding["severity"]).upper(), "none")
 
         card = f"""
             <article class="finding-card">
                 <div class="finding-card-header">
-                    <h3>{finding['control_id']}</h3>
+                    <h3>{escape_html(finding['control_id'])}</h3>
 
-                    <span class="severity-badge severity-{finding['severity'].lower()}">
-                        {finding['severity']}
+                    <span class="severity-badge severity-{severity_class}">
+                        {escape_html(finding['severity'])}
                     </span>
                 </div>
 
                 <div class="finding-content">
                     <div class="finding-detail">
                         <h4>Finding</h4>
-                        <p>{finding['finding_description']}</p>
+                        <p>{escape_html(finding['finding_description'])}</p>
                     </div>
 
                     <div class="finding-detail">
@@ -875,7 +913,7 @@ def format_html_management_findings(management_findings):
 
                     <div class="finding-detail">
                         <h4>Recommendation</h4>
-                        <p>{finding['recommendation']}</p>
+                        <p>{escape_html(finding['recommendation'])}</p>
                     </div>
                 </div>
             </article>
@@ -883,7 +921,7 @@ def format_html_management_findings(management_findings):
 
         finding_cards.append(card)
 
-    return '\n'.join(finding_cards)
+    return "\n".join(finding_cards)
 
 
 def format_html_control_outcomes(summary):
@@ -1067,18 +1105,15 @@ def format_html_evidence_comparison(findings):
     # the same reference point while preserving the actual values.
     max_count = max(
         (
-            max(
-                finding['exception_count'],
-                finding['evidence_issue_count']
-            )
+            max(finding["exception_count"], finding["evidence_issue_count"])
             for finding in findings
         ),
-        default=0
+        default=0,
     )
 
     for finding in findings:
-        exception_count = finding['exception_count']
-        evidence_issue_count = finding['evidence_issue_count']
+        exception_count = finding["exception_count"]
+        evidence_issue_count = finding["evidence_issue_count"]
 
         # Convert counts into relative bar widths for presentation.
         # The displayed numbers remain the authoritative values.
@@ -1086,17 +1121,13 @@ def format_html_evidence_comparison(findings):
             exception_percent = 0
             evidence_percent = 0
         else:
-            exception_percent = (
-                exception_count / max_count * 100
-            )
-            evidence_percent = (
-                evidence_issue_count / max_count * 100
-            )
+            exception_percent = exception_count / max_count * 100
+            evidence_percent = evidence_issue_count / max_count * 100
 
         row = f"""
             <div class="comparison-row">
                 <div class="comparison-control">
-                    {finding['control_id']}
+                    {escape_html(finding['control_id'])}
                 </div>
 
                 <div class="comparison-measure">
@@ -1143,10 +1174,8 @@ def format_html_evidence_comparison(findings):
 
 
 def format_html_report(
-        findings,
-        assessment_date=None,
-        assessment_scope=None,
-        framework_alignment=None):
+    findings, assessment_date=None, assessment_scope=None, framework_alignment=None
+):
     """
     Format control-assurance findings as an HTML management report.
 
@@ -1937,17 +1966,17 @@ def format_html_report(
             <div class="assessment-context">
                 <div>
                     <span>Assessment Date</span>
-                    <strong>{assessment_date or 'Not specified'}</strong>
+                    <strong>{escape_html(assessment_date or 'Not specified')}</strong>
                 </div>
 
                 <div>
                     <span>Assessment Scope</span>
-                    <strong>{assessment_scope or 'Not specified'}</strong>
+                    <strong>{escape_html(assessment_scope or 'Not specified')}</strong>
                 </div>
 
                 <div>
                     <span>Framework Alignment</span>
-                    <strong>{framework_alignment or 'Not specified'}</strong>
+                    <strong>{escape_html(framework_alignment or 'Not specified')}</strong>
                 </div>
             </div>
         </header>
