@@ -749,6 +749,75 @@ def escape_html(value):
     return escape(str(value), quote=True)
 
 
+
+def render_html_icon(name, size=18):
+    """
+    Return a self-contained SVG icon for the HTML report.
+
+    Icons use currentColor so their appearance can be
+    controlled through CSS. Unknown names are rejected
+    rather than inserted into HTML.
+    """
+    paths = {
+        'shield-check': (
+            '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>'
+            '<path d="m9 12 2 2 4-4"/>'
+        ),
+        'dashboard': (
+            '<rect x="3" y="3" width="7" height="9" rx="1"/>'
+            '<rect x="14" y="3" width="7" height="5" rx="1"/>'
+            '<rect x="14" y="12" width="7" height="9" rx="1"/>'
+            '<rect x="3" y="16" width="7" height="5" rx="1"/>'
+        ),
+        'chart': (
+            '<path d="M3 3v18h18"/>'
+            '<path d="M7 16v-4"/>'
+            '<path d="M12 16V8"/>'
+            '<path d="M17 16V5"/>'
+        ),
+        'clipboard-check': (
+            '<rect x="5" y="4" width="14" height="18" rx="2"/>'
+            '<path d="M9 4.5h6"/>'
+            '<path d="m9 14 2 2 4-4"/>'
+        ),
+        'alert': (
+            '<path d="m12 3 10 18H2L12 3z"/>'
+            '<path d="M12 9v5"/>'
+            '<path d="M12 18h.01"/>'
+        ),
+        'check': (
+            '<circle cx="12" cy="12" r="9"/>'
+            '<path d="m8 12 3 3 5-6"/>'
+        ),
+        'x-circle': (
+            '<circle cx="12" cy="12" r="9"/>'
+            '<path d="m9 9 6 6m0-6-6 6"/>'
+        ),
+        'file-warning': (
+            '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>'
+            '<path d="M14 2v6h6"/>'
+            '<path d="M12 12v4"/>'
+            '<path d="M12 19h.01"/>'
+        ),
+    }
+
+    if name not in paths:
+        raise ValueError(f'Unsupported report icon: {name}')
+
+    if not isinstance(size, int) or not 12 <= size <= 48:
+        raise ValueError('Icon size must be an integer between 12 and 48')
+
+    return (
+        f'<svg class="report-icon" width="{size}" height="{size}" '
+        f'viewBox="0 0 24 24" fill="none" '
+        f'stroke="currentColor" stroke-width="1.8" '
+        f'stroke-linecap="round" stroke-linejoin="round" '
+        f'aria-hidden="true" focusable="false">'
+        f'{paths[name]}'
+        '</svg>'
+    )
+
+
 def format_html_control_results(findings):
     """
     Format all control-assessment findings as HTML result cards.
@@ -788,8 +857,41 @@ def format_html_control_results(findings):
 
         result_class = result_classes.get(str(finding["result"]).upper(), "unknown")
 
+        # Map each control outcome to an appropriate SVG icon.
+        # Unknown outcomes receive a neutral icon.
+        result_icons = {
+            'PASS': 'check',
+            'FAIL': 'x-circle',
+            'NOT ASSESSED': 'dashboard',
+        }
+
+        # Select and render the icon for this control.
+        result_icon_name = result_icons.get(
+            str(finding['result']).upper(),
+            'dashboard'
+        )
+
+        result_icon = render_html_icon(result_icon_name, 15)
+
         severity_class = severity_classes.get(
             str(finding.get("severity")).upper(), "none"
+        )
+
+        # Select an SVG icon for active finding severities.
+        # Controls without an assigned severity receive no icon.
+        severity_icons = {
+            'HIGH': 'alert',
+            'CRITICAL': 'alert',
+        }
+
+        severity_icon_name = severity_icons.get(
+            str(finding.get('severity')).upper()
+        )
+
+        severity_icon = (
+            render_html_icon(severity_icon_name, 14)
+            if severity_icon_name
+            else ''
         )
 
         if risk_score is None:
@@ -806,10 +908,12 @@ def format_html_control_results(findings):
 
                     <div class="control-status">
                         <span class="result-badge result-{result_class}">
+                            {result_icon}
                             {escape_html(finding['result'])}
                         </span>
 
                         <span class="severity-badge severity-{severity_class}">
+                            {severity_icon}
                             {escape_html(severity)}
                         </span>
                     </div>
@@ -888,7 +992,26 @@ def format_html_management_findings(management_findings):
         # Restrict severity CSS classes to known values.
         severity_classes = {"HIGH": "high", "CRITICAL": "critical"}
 
+        # Use the finding's severity for the management report.
+        severity = finding['severity']
+
         severity_class = severity_classes.get(str(finding["severity"]).upper(), "none")
+
+        # Display severity icons only for active risk findings.
+        severity_icons = {
+            'HIGH': 'alert',
+            'CRITICAL': 'alert',
+        }
+
+        severity_icon_name = severity_icons.get(
+            str(finding.get('severity')).upper()
+        )
+
+        severity_icon = (
+            render_html_icon(severity_icon_name, 14)
+            if severity_icon_name
+            else ''
+        )
 
         card = f"""
             <article class="finding-card">
@@ -896,7 +1019,8 @@ def format_html_management_findings(management_findings):
                     <h3>{escape_html(finding['control_id'])}</h3>
 
                     <span class="severity-badge severity-{severity_class}">
-                        {escape_html(finding['severity'])}
+                        {severity_icon}
+                        {escape_html(severity)}
                     </span>
                 </div>
 
@@ -1218,10 +1342,15 @@ def format_html_report(
             box-sizing: border-box;
         }}
 
+        /*
+        Dark dashboard foundation.
+        The page background contrasts with the report container,
+        while maintaining readable text and restrained borders.
+        */
         body {{
             margin: 0;
-            background: #f3f5f7;
-            color: #24303d;
+            background: #0b1120;
+            color: #e2e8f0;
             font-family:
                 -apple-system,
                 BlinkMacSystemFont,
@@ -1232,30 +1361,52 @@ def format_html_report(
         }}
 
         /*
-        Main report container. The white document surface separates
-        the management report from the browser background.
+        Main dashboard container.
+        Preserve the existing dimensions and spacing while
+        replacing the light document surface with a dark panel.
         */
         main {{
             width: min(1180px, calc(100% - 48px));
             margin: 40px auto;
-            background: #ffffff;
-            border: 1px solid #dfe4e8;
-            border-radius: 10px;
+            background: #111827;
+            border: 1px solid #263449;
+            border-radius: 12px;
             padding: 48px;
-            box-shadow: 0 8px 24px rgba(20, 34, 48, 0.08);
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.24);
+        }}
+
+        /* ---------- Report Icons ---------- */
+
+        /*
+        Keep inline SVG icons aligned with report headings.
+        Icons inherit their color from the surrounding text.
+        */
+        .report-icon {{
+            display: inline-block;
+            flex-shrink: 0;
+            vertical-align: -0.18em;
+        }}
+
+        header h1 .report-icon,
+        section > h2 .report-icon {{
+            margin-right: 8px;
         }}
 
         /* ---------- Report Header ---------- */
 
+        /*
+        Establish a clear hierarchy between the report title,
+        organization, and assessment metadata.
+        */
         header {{
             padding-bottom: 28px;
             margin-bottom: 36px;
-            border-bottom: 3px solid #17324d;
+            border-bottom: 1px solid #334155;
         }}
 
         header h1 {{
             margin: 0;
-            color: #17324d;
+            color: #f8fafc;
             font-size: 32px;
             font-weight: 700;
             letter-spacing: -0.5px;
@@ -1263,7 +1414,7 @@ def format_html_report(
 
         header h2 {{
             margin: 8px 0 0;
-            color: #65717d;
+            color: #94a3b8;
             font-size: 18px;
             font-weight: 500;
         }}
@@ -1271,8 +1422,8 @@ def format_html_report(
         /* ---------- Assessment Context ---------- */
 
         /*
-        Assessment metadata establishes when the review was performed,
-        what was in scope, and which framework informed the assessment.
+        Present assessment metadata in a responsive grid,
+        separating labels from their corresponding values.
         */
         .assessment-context {{
             display: grid;
@@ -1280,7 +1431,7 @@ def format_html_report(
             gap: 18px;
             margin-top: 24px;
             padding-top: 20px;
-            border-top: 1px solid #dfe4e8;
+            border-top: 1px solid #263449;
         }}
 
         .assessment-context > div {{
@@ -1290,7 +1441,7 @@ def format_html_report(
         }}
 
         .assessment-context span {{
-            color: #71808d;
+            color: #94a3b8;
             font-size: 10px;
             font-weight: 700;
             letter-spacing: 0.4px;
@@ -1298,7 +1449,7 @@ def format_html_report(
         }}
 
         .assessment-context strong {{
-            color: #364553;
+            color: #e2e8f0;
             font-size: 13px;
             font-weight: 600;
             line-height: 1.5;
@@ -1312,7 +1463,7 @@ def format_html_report(
 
         section > h2 {{
             margin: 0 0 20px;
-            color: #17324d;
+            color: #f1f5f9;
             font-size: 22px;
             font-weight: 650;
         }}
@@ -1320,21 +1471,27 @@ def format_html_report(
         /* ---------- Executive Summary Metrics ---------- */
 
         /*
-        Display the eight executive metrics as two rows of four
-        cards on standard desktop displays.
+        Display eight executive metrics in a four-column grid.
+        Responsive breakpoints are handled later in the stylesheet.
         */
         .metrics {{
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            grid-template-columns: repeat(4, minmax(0, 1fr));
             gap: 16px;
         }}
 
+        /*
+        Use a consistent dark surface for every metric.
+        Semantic meaning is conveyed through the left border
+        and metric value rather than different card backgrounds.
+        */
         .metric {{
             min-height: 110px;
             padding: 20px;
-            background: #f8fafb;
-            border: 1px solid #dfe4e8;
-            border-radius: 8px;
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-left: 4px solid #64748b;
+            border-radius: 10px;
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -1342,106 +1499,105 @@ def format_html_report(
 
         .metric-value {{
             display: block;
-            margin-bottom: 6px;
-            color: #17324d;
+            margin-bottom: 8px;
+            color: #f8fafc;
             font-size: 30px;
             font-weight: 700;
-            line-height: 1;
+            line-height: 1.1;
         }}
 
         .metric-label {{
             display: block;
-            color: #65717d;
-            font-size: 13px;
+            color: #94a3b8;
+            font-size: 12px;
             font-weight: 600;
-            letter-spacing: 0.3px;
+            letter-spacing: 0.4px;
             text-transform: uppercase;
         }}
 
         /* ---------- Semantic Metric States ---------- */
 
         /*
-        Successful control outcomes use restrained green to make
-        favorable assessment results immediately recognizable.
+        Passed controls: successful assurance outcomes.
         */
         .metric-passed {{
-            border-left: 4px solid #2f7d5a;
-            background: #f3faf6;
+            border-left-color: #34d399;
         }}
 
         .metric-passed .metric-value {{
-            color: #2f7d5a;
+            color: #6ee7b7;
         }}
 
         /*
-        Confirmed control failures use red. This styling represents
-        the control result and is separate from risk severity.
+        Failed controls: confirmed control failures.
         */
         .metric-failed {{
-            border-left: 4px solid #b54747;
-            background: #fdf6f6;
+            border-left-color: #f87171;
         }}
 
         .metric-failed .metric-value {{
-            color: #a33f3f;
+            color: #fca5a5;
         }}
 
         /*
-        Evidence-quality issues use amber because deficient evidence
-        is not equivalent to a confirmed control failure.
+        Evidence issues: assessment-quality concerns,
+        distinct from confirmed control failures.
         */
         .metric-evidence {{
-            border-left: 4px solid #c58a2b;
-            background: #fdf9f1;
+            border-left-color: #fbbf24;
         }}
 
         .metric-evidence .metric-value {{
-            color: #9a681e;
+            color: #fcd34d;
         }}
 
         /*
-        Exception volume receives visual emphasis without assigning
-        risk severity to the aggregate exception count.
+        Exceptions: aggregate volume, not a severity rating.
         */
         .metric-exceptions {{
-            border-left: 4px solid #657b8f;
+            border-left-color: #38bdf8;
+        }}
+
+        .metric-exceptions .metric-value {{
+            color: #7dd3fc;
         }}
 
         /*
-        High-severity findings receive stronger management emphasis
-        while remaining visually distinct from the FAIL result.
+        High-severity findings: elevated risk.
         */
         .metric-high {{
-            border-left: 4px solid #b85c38;
-            background: #fdf7f3;
+            border-left-color: #fb923c;
         }}
 
         .metric-high .metric-value {{
-            color: #a34d2f;
+            color: #fdba74;
         }}
 
         /*
-        Critical severity is reserved for the strongest risk signal.
-        The styling remains available even when the current count is 0.
+        Critical findings: strongest severity signal.
         */
         .metric-critical {{
-            border-left: 4px solid #8f2d2d;
+            border-left-color: #e879f9;
+        }}
+
+        .metric-critical .metric-value {{
+            color: #f0abfc;
         }}
 
         /*
-        Overall assessment population and NOT ASSESSED remain neutral
-        because neither state independently indicates control failure.
+        Neutral states: assessment population and controls
+        that could not be assessed.
         */
         .metric-neutral,
         .metric-not-assessed {{
-            border-left: 4px solid #66788a;
+            border-left-color: #64748b;
         }}
 
         /* ---------- Control Results ---------- */
 
         /*
-        Stack control results vertically so each control reads as a
-        discrete assurance result rather than a dashboard tile.
+        Display each assessed control as a separate dashboard
+        panel with a clear outcome indicator.
         */
         .control-results {{
             display: grid;
@@ -1450,26 +1606,26 @@ def format_html_report(
 
         .control-card {{
             padding: 22px 24px;
-            background: #ffffff;
-            border: 1px solid #dfe4e8;
-            border-left: 4px solid #66788a;
-            border-radius: 8px;
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-left: 4px solid #64748b;
+            border-radius: 10px;
         }}
 
         /*
-        The left border provides a quick visual indication of the
-        control result without overwhelming the report with color.
+        Control outcome colors remain distinct from
+        finding severity and evidence-quality indicators.
         */
         .control-fail {{
-            border-left-color: #b54747;
+            border-left-color: #f87171;
         }}
 
         .control-pass {{
-            border-left-color: #2f7d5a;
+            border-left-color: #34d399;
         }}
 
         .control-not-assessed {{
-            border-left-color: #66788a;
+            border-left-color: #64748b;
         }}
 
         /* ---------- Control Card Header ---------- */
@@ -1484,7 +1640,7 @@ def format_html_report(
 
         .control-card-header h3 {{
             margin: 0;
-            color: #17324d;
+            color: #f8fafc;
             font-size: 19px;
             font-weight: 700;
         }}
@@ -1497,9 +1653,17 @@ def format_html_report(
 
         /* ---------- Result and Severity Badges ---------- */
 
+        /*
+        Use contrasting dark badge backgrounds and readable
+        foreground colors to distinguish outcome and severity.
+        Align SVG icons and text consistently.
+        */
         .result-badge,
         .severity-badge {{
-            display: inline-block;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
             padding: 5px 9px;
             border-radius: 5px;
             font-size: 11px;
@@ -1509,70 +1673,70 @@ def format_html_report(
         }}
 
         .result-pass {{
-            background: #e7f4ec;
-            color: #246746;
+            background: #064e3b;
+            color: #a7f3d0;
         }}
 
         .result-fail {{
-            background: #f8e8e8;
-            color: #983d3d;
+            background: #7f1d1d;
+            color: #fecaca;
         }}
 
         .result-not-assessed {{
-            background: #edf0f2;
-            color: #596b7b;
+            background: #334155;
+            color: #cbd5e1;
         }}
 
         .severity-high {{
-            background: #f8ede7;
-            color: #9a492e;
+            background: #7c2d12;
+            color: #fed7aa;
         }}
 
         .severity-critical {{
-            background: #f5e3e3;
-            color: #842929;
+            background: #701a75;
+            color: #f5d0fe;
         }}
 
         /*
-        PASS and NOT ASSESSED controls may have no active risk
-        severity. N/A is therefore displayed as a neutral state.
+        Controls without an active risk rating display
+        a neutral N/A severity indicator.
         */
         .severity-none {{
-            background: #edf0f2;
-            color: #687783;
+            background: #334155;
+            color: #cbd5e1;
         }}
 
         /* ---------- Control Requirement ---------- */
 
         .control-requirement {{
             margin: 0 0 18px;
-            color: #364553;
+            color: #cbd5e1;
             font-size: 15px;
         }}
 
         /* ---------- Control Metrics ---------- */
 
         /*
-        Definition-list elements are used because each value has a
-        specific management-facing label.
+        Preserve the six-column definition-list layout.
+        Individual metrics use a slightly darker inset surface.
         */
         .control-metrics {{
             display: grid;
-            grid-template-columns: repeat(6, 1fr);
+            grid-template-columns: repeat(6, minmax(0, 1fr));
             gap: 10px;
             margin: 0;
         }}
 
         .control-metrics > div {{
             padding: 12px;
-            background: #f8fafb;
-            border: 1px solid #e5e9ec;
+            background: #0f172a;
+            border: 1px solid #334155;
             border-radius: 6px;
         }}
 
         .control-metrics dt {{
             margin-bottom: 4px;
-            color: #71808d;
+            color: #94a3b8;
             font-size: 10px;
             font-weight: 700;
             letter-spacing: 0.35px;
@@ -1581,24 +1745,28 @@ def format_html_report(
 
         .control-metrics dd {{
             margin: 0;
-            color: #24303d;
+            color: #f1f5f9;
             font-size: 15px;
             font-weight: 650;
         }}
 
         /* ---------- Visual Analysis ---------- */
 
+        /*
+        Arrange the two summary charts side by side.
+        The evidence comparison spans the full width below.
+        */
         .visual-analysis {{
             display: grid;
-            grid-template-columns: repeat(2, 1fr);
+            grid-template-columns: repeat(2, minmax(0, 1fr));
             gap: 18px;
         }}
 
         .visual-card {{
             padding: 24px;
-            background: #ffffff;
-            border: 1px solid #dfe4e8;
-            border-radius: 8px;
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 10px;
         }}
 
         .visual-header {{
@@ -1607,20 +1775,20 @@ def format_html_report(
 
         .visual-header h3 {{
             margin: 0 0 4px;
-            color: #17324d;
+            color: #f8fafc;
             font-size: 18px;
             font-weight: 700;
         }}
 
         .visual-header p {{
             margin: 0;
-            color: #71808d;
+            color: #94a3b8;
             font-size: 13px;
         }}
 
         /*
-        The evidence comparison contains one row per control, so it spans
-        the full report width beneath the two summary visualizations.
+        The evidence comparison spans both columns
+        because it contains one row per assessed control.
         */
         .visual-card-wide {{
             grid-column: 1 / -1;
@@ -1628,16 +1796,12 @@ def format_html_report(
 
         /* ---------- Control Outcome Bar ---------- */
 
-        /*
-        The stacked bar represents the proportion of PASS, FAIL,
-        and NOT ASSESSED control outcomes.
-        */
         .outcome-bar {{
             display: flex;
             width: 100%;
             height: 24px;
             overflow: hidden;
-            background: #edf0f2;
+            background: #0f172a;
             border-radius: 6px;
         }}
 
@@ -1646,15 +1810,15 @@ def format_html_report(
         }}
 
         .outcome-pass {{
-            background: #2f7d5a;
+            background: #34d399;
         }}
 
         .outcome-fail {{
-            background: #b54747;
+            background: #f87171;
         }}
 
         .outcome-not-assessed {{
-            background: #7a8996;
+            background: #64748b;
         }}
 
         /* ---------- Control Outcome Legend ---------- */
@@ -1670,13 +1834,13 @@ def format_html_report(
             display: flex;
             align-items: center;
             gap: 7px;
-            color: #53616e;
+            color: #cbd5e1;
             font-size: 13px;
         }}
 
         .outcome-legend strong {{
             margin-left: 2px;
-            color: #24303d;
+            color: #f8fafc;
         }}
 
         .legend-marker {{
@@ -1686,29 +1850,29 @@ def format_html_report(
         }}
 
         .legend-pass {{
-            background: #2f7d5a;
+            background: #34d399;
         }}
 
         .legend-fail {{
-            background: #b54747;
+            background: #f87171;
         }}
 
         .legend-not-assessed {{
-            background: #7a8996;
+            background: #64748b;
         }}
 
         /* ---------- Finding Severity ---------- */
 
         /*
-        Severity is visualized independently from control outcome.
-        Only findings with active risk are represented here.
+        Severity remains separate from control outcome.
+        High and Critical findings have distinct colors.
         */
         .severity-bar {{
             display: flex;
             width: 100%;
             height: 24px;
             overflow: hidden;
-            background: #edf0f2;
+            background: #0f172a;
             border-radius: 6px;
         }}
 
@@ -1717,11 +1881,11 @@ def format_html_report(
         }}
 
         .severity-bar-high {{
-            background: #b85c38;
+            background: #fb923c;
         }}
 
         .severity-bar-critical {{
-            background: #8f2d2d;
+            background: #e879f9;
         }}
 
         .severity-legend {{
@@ -1735,21 +1899,21 @@ def format_html_report(
             display: flex;
             align-items: center;
             gap: 7px;
-            color: #53616e;
+            color: #cbd5e1;
             font-size: 13px;
         }}
 
         .severity-legend strong {{
             margin-left: 2px;
-            color: #24303d;
+            color: #f8fafc;
         }}
 
         .legend-high {{
-            background: #b85c38;
+            background: #fb923c;
         }}
 
         .legend-critical {{
-            background: #8f2d2d;
+            background: #e879f9;
         }}
 
         /* ---------- Exceptions vs. Evidence Issues ---------- */
@@ -1767,20 +1931,20 @@ def format_html_report(
         }}
 
         .comparison-control {{
-            color: #17324d;
+            color: #f1f5f9;
             font-size: 13px;
             font-weight: 700;
         }}
 
         .comparison-measure {{
             display: grid;
-            grid-template-columns: 95px 1fr 24px;
+            grid-template-columns: 95px minmax(0, 1fr) 24px;
             gap: 10px;
             align-items: center;
         }}
 
         .comparison-label {{
-            color: #65717d;
+            color: #94a3b8;
             font-size: 11px;
             font-weight: 600;
         }}
@@ -1788,7 +1952,7 @@ def format_html_report(
         .comparison-track {{
             height: 12px;
             overflow: hidden;
-            background: #edf0f2;
+            background: #0f172a;
             border-radius: 4px;
         }}
 
@@ -1798,20 +1962,20 @@ def format_html_report(
         }}
 
         /*
-        Red represents confirmed control exceptions.
-        Amber represents evidence-quality issues.
-        These are intentionally distinct concepts.
+        Confirmed exceptions use red.
+        Evidence-quality issues use amber to avoid
+        implying that missing evidence is a control failure.
         */
         .comparison-exception {{
-            background: #b54747;
+            background: #f87171;
         }}
 
         .comparison-evidence {{
-            background: #c58a2b;
+            background: #fbbf24;
         }}
 
         .comparison-measure strong {{
-            color: #24303d;
+            color: #f8fafc;
             font-size: 12px;
             text-align: right;
         }}
@@ -1819,8 +1983,9 @@ def format_html_report(
         /* ---------- Management Findings ---------- */
 
         /*
-        Remediation findings are stacked vertically because each
-        represents a discrete management action.
+        Display each remediation finding as a separate panel.
+        The accent border distinguishes findings from
+        general control-assessment results.
         */
         .management-findings {{
             display: grid;
@@ -1829,10 +1994,10 @@ def format_html_report(
 
         .finding-card {{
             padding: 24px;
-            background: #ffffff;
-            border: 1px solid #dfe4e8;
-            border-left: 4px solid #b85c38;
-            border-radius: 8px;
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-left: 4px solid #fb923c;
+            border-radius: 10px;
         }}
 
         /* ---------- Finding Header ---------- */
@@ -1844,12 +2009,12 @@ def format_html_report(
             gap: 20px;
             padding-bottom: 14px;
             margin-bottom: 18px;
-            border-bottom: 1px solid #e5e9ec;
+            border-bottom: 1px solid #334155;
         }}
 
         .finding-card-header h3 {{
             margin: 0;
-            color: #17324d;
+            color: #f8fafc;
             font-size: 19px;
             font-weight: 700;
         }}
@@ -1863,7 +2028,7 @@ def format_html_report(
 
         .finding-detail h4 {{
             margin: 0 0 5px;
-            color: #65717d;
+            color: #94a3b8;
             font-size: 11px;
             font-weight: 700;
             letter-spacing: 0.4px;
@@ -1872,24 +2037,80 @@ def format_html_report(
 
         .finding-detail p {{
             margin: 0;
-            color: #364553;
+            color: #cbd5e1;
             font-size: 14px;
             line-height: 1.6;
         }}
 
         /*
-        Recommendations receive a subtle background treatment so
-        management can quickly distinguish the required action from
-        the description of the control deficiency.
+        Highlight the recommended management action
+        without implying an additional risk rating.
         */
         .finding-detail:last-child {{
             padding: 14px 16px;
-            background: #f7f9fa;
-            border-radius: 6px;
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 8px;
         }}
 
         .finding-detail:last-child h4 {{
-            color: #17324d;
+            color: #7dd3fc;
+        }}
+
+        /* ---------- KPI Icons ---------- */
+
+        /*
+        Display SVG icons above the metric values.
+        Icons inherit their color from their metric cards.
+        */
+        .metric-icon {{
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            margin-bottom: 12px;
+            color: inherit;
+        }}
+
+        /* ---------- KPI Icon Colors ---------- */
+
+        /*
+        Match each icon to its metric's semantic color.
+        Keep control outcomes, evidence issues, and finding
+        severities visually distinct.
+        */
+
+        .metric-neutral .metric-icon {{
+            color: #e2e8f0;
+        }}
+
+        .metric-passed .metric-icon {{
+            color: #34d399;
+        }}
+
+        .metric-failed .metric-icon {{
+            color: #f87171;
+        }}
+
+        .metric-not-assessed .metric-icon {{
+            color: #94a3b8;
+        }}
+
+        .metric-exceptions .metric-icon {{
+            color: #38bdf8;
+        }}
+
+        .metric-evidence .metric-icon {{
+            color: #fbbf24;
+        }}
+
+        .metric-high .metric-icon {{
+            color: #fb923c;
+        }}
+
+        .metric-critical .metric-icon {{
+            color: #e879f9;
         }}
 
         /* ---------- Responsive Layout ---------- */
@@ -1936,7 +2157,7 @@ def format_html_report(
                 grid-template-columns: repeat(2, 1fr);
             }}
 
-            finding-card-header {{
+            .finding-card-header {{
                 align-items: flex-start;
                 flex-direction: column;
             }}
@@ -1960,7 +2181,7 @@ def format_html_report(
 <body>
     <main>
         <header>
-            <h1>Control Assurance Engine</h1>
+            <h1>{render_html_icon('shield-check', 28)} Control Assurance Engine</h1>
             <h2>Northstar BuildCo — Management Assessment Report</h2>
 
             <div class="assessment-context">
@@ -1982,12 +2203,15 @@ def format_html_report(
         </header>
 
         <section>
-            <h2>Executive Summary</h2>
+            <h2>{render_html_icon('dashboard', 21)} Executive Summary</h2>
 
             <div class="metrics">
 
             <!-- Overall number of controls evaluated. -->
             <div class="metric metric-neutral">
+                <span class="metric-icon">
+                    {render_html_icon('clipboard-check', 20)}
+                </span>
                 <span class="metric-value">
                     {summary['controls_assessed']}
                 </span>
@@ -1996,6 +2220,9 @@ def format_html_report(
 
             <!-- Controls that satisfied their defined requirements. -->
             <div class="metric metric-passed">
+                <span class="metric-icon">
+                    {render_html_icon('check', 20)}
+                </span>
                 <span class="metric-value">
                     {summary['passed']}
                 </span>
@@ -2004,6 +2231,9 @@ def format_html_report(
 
             <!-- Controls with confirmed exceptions. -->
             <div class="metric metric-failed">
+                <span class="metric-icon">
+                    {render_html_icon('x-circle', 20)}
+                </span>
                 <span class="metric-value">
                     {summary['failed']}
                 </span>
@@ -2012,6 +2242,9 @@ def format_html_report(
 
             <!-- Controls that could not be assessed from available evidence. -->
             <div class="metric metric-not-assessed">
+                <span class="metric-icon">
+                    {render_html_icon('dashboard', 20)}
+                </span>
                 <span class="metric-value">
                     {summary['not_assessed']}
                 </span>
@@ -2020,6 +2253,9 @@ def format_html_report(
 
             <!-- Confirmed exceptions across all evaluated controls. -->
             <div class="metric metric-exceptions">
+                <span class="metric-icon">
+                    {render_html_icon('alert', 20)}
+                </span>
                 <span class="metric-value">
                     {summary['total_exceptions']}
                 </span>
@@ -2028,6 +2264,9 @@ def format_html_report(
 
             <!-- Evidence-quality issues kept separate from control failures. -->
             <div class="metric metric-evidence">
+                <span class="metric-icon">
+                    {render_html_icon('file-warning', 20)}
+                </span>
                 <span class="metric-value">
                     {summary['evidence_issues']}
                 </span>
@@ -2036,6 +2275,9 @@ def format_html_report(
 
             <!-- Failed controls rated High severity. -->
             <div class="metric metric-high">
+                <span class="metric-icon">
+                    {render_html_icon('alert', 20)}
+                </span>
                 <span class="metric-value">
                     {summary['high_findings']}
                 </span>
@@ -2044,6 +2286,9 @@ def format_html_report(
 
             <!-- Failed controls rated Critical severity. -->
             <div class="metric metric-critical">
+                <span class="metric-icon">
+                    {render_html_icon('shield-check', 20)}
+                </span>
                 <span class="metric-value">
                     {summary['critical_findings']}
                 </span>
@@ -2054,7 +2299,7 @@ def format_html_report(
         </section>
 
         <section>
-            <h2>Visual Analysis</h2>
+            <h2>{render_html_icon('chart', 21)} Visual Analysis</h2>
 
             <div class="visual-analysis">
                 {format_html_control_outcomes(summary)}
@@ -2064,7 +2309,7 @@ def format_html_report(
         </section>
 
         <section>
-            <h2>Control Results</h2>
+            <h2>{render_html_icon('clipboard-check', 21)} Control Results</h2>
 
             <div class="control-results">
                 {format_html_control_results(findings)}
@@ -2072,7 +2317,7 @@ def format_html_report(
         </section>
 
         <section>
-            <h2>Findings Requiring Remediation</h2>
+            <h2>{render_html_icon('alert', 21)} Findings Requiring Remediation</h2>
 
             <div class="management-findings">
                 {format_html_management_findings(management_findings)}

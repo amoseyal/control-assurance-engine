@@ -995,7 +995,12 @@ def test_format_html_report_returns_complete_html_document():
     assert '<!DOCTYPE html>' in report
     assert '<html lang="en">' in report
     assert '<title>Control Assurance Engine | Management Report</title>' in report
-    assert '<h1>Control Assurance Engine</h1>' in report
+    # Verify that the report title includes its SVG icon.
+    # The icon must appear inside the H1 element.
+    assert '<h1><svg class="report-icon"' in report
+    assert 'Control Assurance Engine</h1>' in report
+
+    # Verify the assessed organization's name
     assert 'Northstar BuildCo' in report
     assert '</html>' in report
 
@@ -1049,7 +1054,9 @@ def test_format_html_report_uses_executive_summary_metrics():
 
     # Verify that the complete report also incorporates the
     # detailed control-results section.
-    assert '<h2>Control Results</h2>' in report
+    # Verify the Control Results heading with its SVG icon.
+    assert '<h2>' in report
+    assert 'Control Results</h2>' in report
     assert 'END-02' in report
     assert 'IAM-01' in report
     assert 'PR.PS-05' in report
