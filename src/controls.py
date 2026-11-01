@@ -17,14 +17,18 @@ def assess_iam_01(users):
             
     Returns:
         tuple:
-            two pandas DataFrames:
+            Three pandas DataFrames:
 
-            exceptions:
-                active accounts that do not have MFA enabled.
+                exceptions:
+                    Active accounts that do not have MFA enabled.
 
                 evidence_issues:
-                    accounts that cannot be reliably assessed because
+                    Accounts that cannot be reliably assessed because
                     required control evidence is missing.
+
+                assessable_population:
+                    Active accounts with sufficient evidence to
+                    determine whether MFA is enabled.
     """
 
     # Identify records where evidence is insufficient to assess IAM-01.
@@ -63,9 +67,6 @@ def assess_iam_01(users):
     )
 
     # Keep only active accounts with sufficient evidence to evaluate MFA.
-    assessable_population = users[assessable_mask]
-
-    # Keep only records for which the control can make a determination.
     assessable_population = users[assessable_mask]
 
     # Identify confirmed IAM-01 control expectations.
