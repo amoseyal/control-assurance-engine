@@ -14,5 +14,5 @@ __pycache__/
 # Private assessment records
 /data/assessments/
 
-# Local VS Coce editor preferences
+# Local VS Code editor preferences
 .vscode/
