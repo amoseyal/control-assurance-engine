@@ -9,6 +9,7 @@ from src.assessment_service import create_assessment
 from src.assessment_workspace import (
     AssessmentSummary,
     get_assessment_summaries,
+    get_assessment_detail
 )
 
 
@@ -36,8 +37,8 @@ def test_get_assessment_summaries_returns_sorted_dtos(tmp_path):
             assessor='Security Analyst',
             assessment_date=date(2026, 11, 1),
             framework='NIST CSF 2.0',
-            scope='Enterprise cybersecurity controls',
-        ),
+            scope='Enterprise cybersecurity controls'
+        )
     ]
 
     # Persist both records using the assessment service.
@@ -64,7 +65,7 @@ def test_get_assessment_summaries_returns_sorted_dtos(tmp_path):
         summary.assessment_id for summary in summaries
     ] == [
         'ASM-2026-001',
-        'ASM-2026-002',
+        'ASM-2026-002'
     ]
 
     # Verify that assessment metadata was transferred correctly.
@@ -81,7 +82,7 @@ def test_get_assessment_summaries_returns_sorted_dtos(tmp_path):
         organization='Southridge Technologies',
         assessment_date=date(2026, 11, 5),
         framework='ISO/IEC 27001:2022',
-        scope='Information security management system',
+        scope='Information security management system'
     )
 
     # Verify that retrieving summaries did not modify storage.
@@ -93,3 +94,23 @@ def test_get_assessment_summaries_returns_empty_list(tmp_path):
     summaries = get_assessment_summaries(tmp_path)
 
     assert summaries == []
+
+
+def test_get_assessment_detail_returns_saved_assessment(tmp_path):
+    """Return the selected assessment in a detail DTO."""
+    assessment = Assessment(
+        assessment_id="ASSESS-001",
+        organization="Example Organization",
+        assessor="Test Assessor",
+        assessment_date=date(2026, 11, 12),
+        framework="NIST CSF 2.0",
+        scope="Corporate IT"
+    )
+
+    create_assessment(assessment, [], [], tmp_path)
+
+    detail = get_assessment_detail("ASSESS-001", tmp_path)
+
+    assert detail.assessment == assessment
+    assert detail.control_assessments == ()
+    assert detail.findings == ()
