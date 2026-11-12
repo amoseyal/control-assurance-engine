@@ -1,7 +1,7 @@
 
-'''Tests for assessment workspace application logic
+"""Tests for assessment workspace application logic
 and its Data Transfer Objects (DTOs).
-'''
+"""
 from datetime import date
 
 from src.assessment_models import Assessment
@@ -13,9 +13,9 @@ from src.assessment_workspace import (
 
 
 def test_get_assessment_summaries_returns_sorted_dtos(tmp_path):
-    '''Verify that saved assessment records are converted
+    """Verify that saved assessment records are converted
     into correctly populated and sorted summary DTOs.
-    '''
+    """
     # Create an isolated storage directory.
     storage_directory = tmp_path / 'assessments'
     storage_directory.mkdir()
@@ -89,7 +89,7 @@ def test_get_assessment_summaries_returns_sorted_dtos(tmp_path):
 
 
 def test_get_assessment_summaries_returns_empty_list(tmp_path):
-    '''Return an empty list when the assessment workspace is empty.'''
+    """Return an empty list when the assessment workspace is empty."""
     summaries = get_assessment_summaries(tmp_path)
 
     assert summaries == []
