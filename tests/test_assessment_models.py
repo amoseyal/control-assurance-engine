@@ -600,8 +600,6 @@ def test_finding_initialization():
     )
 
 
-
-
 @pytest.mark.parametrize(
     'field_name, invalid_value',
     [

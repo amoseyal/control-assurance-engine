@@ -13,13 +13,14 @@ from pathlib import Path
 
 from src.assessment_service import (
     get_assessment,
-    list_assessment_ids
+    list_assessment_ids,
+    get_assessment_path,
 )
 
 from src.assessment_models import(
     Assessment,
     ControlAssessment,
-    Finding
+    Finding,
 )
 
 
@@ -90,24 +91,63 @@ class AssessmentDetail:
     control_assessments: tuple[ControlAssessment, ...]
     findings: tuple[Finding, ...]
 
+    @property
+    def total_controls(self) -> int:
+        """Return the number of evaluated controls."""
+        return len(self.control_assessments)
+
+    @property
+    def total_findings(self) -> int:
+        """Return the number of security findings."""
+        return len(self.findings)
+
+    @property
+    def findings_by_severity(self) -> dict[str,int]:
+        """Return the number of findings in each risk severity category."""
+
+        counts = {
+            "LOW": 0,
+            "MODERATE": 0,
+            "HIGH": 0,
+            "CRITICAL": 0,
+        }
+
+        for finding in self.findings:
+            counts[finding.risk_severity] += 1
+
+        return counts
+
 
 def get_assessment_detail(
-        assessment_id: str,
-        storage_directory: Path | None = None
-) -> AssessmentDetail:
-    """Retrieve complete assessment detail for the workspace.
+    assessment_id: str,
+    storage_directory: Path | None = None,
+) -> AssessmentDetail | None:
+    """Retrieve complete assessment details for the workspace.
 
-    Load the assessment Through the existing service layer
+    Load the assessment through the existing service layer
     and return its records in a structured Data Transfer Object.
+
+    Return None if the requested assessment does not exist.
     """
 
-    assessment, control_assessments, findings = get_assessment(
-        assessment_id,
-        storage_directory
-    )
+    try:
+        assessment, control_assessments, findings = get_assessment(
+            assessment_id,
+            storage_directory,
+        )
+    except FileNotFoundError as exc:
+        expected_path = get_assessment_path(
+            assessment_id,
+            storage_directory,
+        )
+
+        if exc.filename is None or Path(exc.filename) != expected_path:
+            raise
+
+        return None
 
     return AssessmentDetail(
         assessment=assessment,
         control_assessments=tuple(control_assessments),
-        findings=tuple(findings)
+        findings=tuple(findings),
     )
