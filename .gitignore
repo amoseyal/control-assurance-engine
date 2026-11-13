@@ -10,3 +10,9 @@ __pycache__/
 
 # macOS metadata
 .DS_Store
+
+# Private assessment records
+/data/assessments/
+
+# Local VS Code editor preferences
+.vscode/
