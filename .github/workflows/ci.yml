@@ -31,5 +31,8 @@ jobs:
       - name: Check formatting
         run: python -m ruff format --check app.py tests/test_app.py scripts/seed_demo_assessment.py
 
+      - name: Prepare assessment storage
+        run: mkdir -p data/assessments
+
       - name: Run tests
         run: python -m pytest -q
