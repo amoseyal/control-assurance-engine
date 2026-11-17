@@ -1,5 +1,5 @@
 """
-AApplication logic for the cybersecurity assessment workspace.
+Application logic for the cybersecurity assessment workspace.
 
 This module defines Data Transfer Objects (DTOs) used to
 transfer structured assessment information between the
@@ -8,19 +8,17 @@ application's service layer and its future user interface.
 
 from dataclasses import dataclass
 from datetime import date
-
 from pathlib import Path
 
-from src.assessment_service import (
-    get_assessment,
-    list_assessment_ids,
-    get_assessment_path,
-)
-
-from src.assessment_models import(
+from src.assessment_models import (
     Assessment,
     ControlAssessment,
     Finding,
+)
+from src.assessment_service import (
+    get_assessment,
+    get_assessment_path,
+    list_assessment_ids,
 )
 
 
@@ -58,12 +56,8 @@ def get_assessment_summaries(
     summaries = []
 
     for assessment_id in assessment_ids:
-
         # Retrieve the validated assessment record.
-        assessment, _, _ = get_assessment(
-            assessment_id,
-            storage_directory
-        )
+        assessment, _, _ = get_assessment(assessment_id, storage_directory)
 
         # Convert assessment metadata into a summary DTO.
         summary = AssessmentSummary(
@@ -71,7 +65,7 @@ def get_assessment_summaries(
             organization=assessment.organization,
             assessment_date=assessment.assessment_date,
             framework=assessment.framework,
-            scope=assessment.scope
+            scope=assessment.scope,
         )
 
         summaries.append(summary)
@@ -102,7 +96,7 @@ class AssessmentDetail:
         return len(self.findings)
 
     @property
-    def findings_by_severity(self) -> dict[str,int]:
+    def findings_by_severity(self) -> dict[str, int]:
         """Return the number of findings in each risk severity category."""
 
         counts = {

@@ -1,19 +1,16 @@
-import pandas as pd
+"""Evaluate identity, endpoint, and third-party security controls."""
 
 
-# ============================================================
-# IDENTITY AND ACCESS MANAGEMENT (IAM) CONTROLS
-# ============================================================
-
+# Identity and Access Management (IAM)
 def assess_iam_01(users):
     """
     Assess IAM-01: all active user accounts must have MFA enabled.
-    
+
     Arguments:
-        users (pd.DataFrame):
+        users (pandas.DataFrame):
             user-account evidence containing, at minimum,
-            "usernaem, 'enabled', and 'mfa_enabled'.
-            
+            "username", "enabled", and "mfa_enabled".
+
     Returns:
         tuple:
             Three pandas DataFrames:
@@ -32,18 +29,14 @@ def assess_iam_01(users):
 
     # Identify records where evidence is insufficient to assess IAM-01.
     #
-    # If 'enabled' is missing, we cannot determine whether the account
+    # If "enabled" is missing, we cannot determine whether the account
     # is in scope for the control.
     #
     # If the account is enabled, MFA status is required to assess it.
     # A disabled account is outside the scope of IAM-01, so a missing
     # MFA value for that account is not an evidence-quality issue.
-    evidence_issue_mask = (
-        users['enabled'].isna()
-        | (
-            (users['enabled'] == True)
-            & users['mfa_enabled'].isna()
-        )
+    evidence_issue_mask = users["enabled"].isna() | (
+        (users["enabled"] == True) & users["mfa_enabled"].isna()
     )
 
     # Keep the records that contain incomplete evidenc.
@@ -60,9 +53,9 @@ def assess_iam_01(users):
     # Disabled accounts are not control failures; they are simply
     # outside the scope of this particular control requirement.
     assessable_mask = (
-        users['enabled'].notna()
-        & (users['enabled'] == True)
-        & users['mfa_enabled'].notna()
+        users["enabled"].notna()
+        & (users["enabled"] == True)
+        & users["mfa_enabled"].notna()
     )
 
     # Keep only active accounts with sufficient evidence to evaluate MFA.
@@ -73,10 +66,7 @@ def assess_iam_01(users):
     # An account fails IAM-01 only when we KNOW that:
     # 1. the account is enabled, AND
     # 2. MFA is not enabled.
-    exception_mask = (
-        (users['enabled'] == True)
-        & (users['mfa_enabled'] == False)
-    )
+    exception_mask = (users["enabled"] == True) & (users["mfa_enabled"] == False)
 
     # Keep only the records that definitively violate IAM-01.
     exceptions = users[exception_mask]
@@ -112,12 +102,8 @@ def assess_iam_02(users):
     #
     # A known active user with a missing enabled value is outside the
     # scope of IAM-02 and therefore is not an IAM-02 evidence issue.
-    evidence_issue_mask = (
-        users['employment_status'].isna()
-        | (
-            (users['employment_status'] == 'terminated')
-            & users['enabled'].isna()
-        )
+    evidence_issue_mask = users["employment_status"].isna() | (
+        (users["employment_status"] == "terminated") & users["enabled"].isna()
     )
 
     # Keep records that cannot be fully evaluated because required
@@ -128,10 +114,9 @@ def assess_iam_02(users):
     #
     # Active employees are outside the scope of IAM-02 because this
     # control specifically addresses terminated users.
-    assessable_mask = (
-        (users['employment_status'] == 'terminated')
-        & users['enabled'].notna()
-    )
+    assessable_mask = (users["employment_status"] == "terminated") & users[
+        "enabled"
+    ].notna()
 
     # Keep only terminated users with sufficient account-status
     # evidence to evaluate the control.
@@ -140,9 +125,8 @@ def assess_iam_02(users):
     # A confirmed IAM-02 exception exists when:
     # - the employee is terminated
     # - the account remains enabled
-    exception_mask = (
-        (users['employment_status'] == 'terminated')
-        & (users['enabled'] == True)
+    exception_mask = (users["employment_status"] == "terminated") & (
+        users["enabled"] == True
     )
 
     # Keep the records that violate IAM-02.
@@ -173,12 +157,8 @@ def assess_iam_03(users):
     # If is_admin is missing, we do not know whether the account
     # has administrative privileges and therefore cannot determine
     # whether IAM-03 applies.
-    evidence_issue_mask = (
-        users['is_admin'].isna()
-        | (
-            (users['is_admin'] == True)
-            & users['admin_approved'].isna()
-        )
+    evidence_issue_mask = users["is_admin"].isna() | (
+        (users["is_admin"] == True) & users["admin_approved"].isna()
     )
 
     # Keep records that cannot be fully evaluated because required
@@ -188,10 +168,7 @@ def assess_iam_03(users):
     # Identify administrative accounts whose approval status is known.
     #
     # Standard user accounts are outside the scope of IAM-03.
-    assessable_mask = (
-        (users['is_admin'] == True)
-        & users['admin_approved'].notna()
-    )
+    assessable_mask = (users["is_admin"] == True) & users["admin_approved"].notna()
 
     # Keep only administrative accounts with sufficient evidence
     # to evaluate the control.
@@ -200,10 +177,7 @@ def assess_iam_03(users):
     # A confirmed IAM-03 exception exists when:
     # - the account has administrative privileges
     # - those privileges are not approved
-    exception_mask = (
-        (users['is_admin'] == True)
-        & (users['admin_approved'] == False)
-    )
+    exception_mask = (users["is_admin"] == True) & (users["admin_approved"] == False)
 
     # Keep the records that violate IAM-03.
     exceptions = users[exception_mask]
@@ -212,11 +186,7 @@ def assess_iam_03(users):
     return exceptions, evidence_issues, assessable_population
 
 
-
-# ============================================================
-# ENDPOINT SECURITY (END) CONTROLS
-# ============================================================
-
+# Endpoint Security (END)
 def assess_end_01(devices):
     """
     Assess END-01: Company-managed endpoints must use disk encryption.
@@ -240,12 +210,8 @@ def assess_end_01(devices):
     # If the device is known to be company-managed but
     # disk_encrypted is missing, we know the device is in scope
     # but lack sufficient evidence to determine compliance.
-    evidence_issue_mask = (
-        devices['company_managed'].isna()
-        | (
-            (devices['company_managed'] == True)
-            & devices['disk_encrypted'].isna()
-        )
+    evidence_issue_mask = devices["company_managed"].isna() | (
+        (devices["company_managed"] == True) & devices["disk_encrypted"].isna()
     )
 
     # Keep devices that cannot be fully evaluated because
@@ -257,10 +223,9 @@ def assess_end_01(devices):
     #
     # Personally owned or otherwise unmanaged devices are outside
     # the scope of END-01.
-    assessable_mask = (
-        (devices['company_managed'] == True)
-        & devices['disk_encrypted'].notna()
-    )
+    assessable_mask = (devices["company_managed"] == True) & devices[
+        "disk_encrypted"
+    ].notna()
 
     # Keep only devices with sufficient evidence to evaluate
     # END-01 compliance.
@@ -269,9 +234,8 @@ def assess_end_01(devices):
     # A confirmed END-01 exception exists when:
     # - the device is company-managed
     # - disk encryption is not enabled
-    exception_mask = (
-        (devices['company_managed'] == True)
-        & (devices['disk_encrypted'] == False)
+    exception_mask = (devices["company_managed"] == True) & (
+        devices["disk_encrypted"] == False
     )
 
     # Keep the devices that violate END-01.
@@ -305,12 +269,8 @@ def assess_end_02(devices):
     # If the device is company-managed but endpoint_protection
     # is missing, we know it is in scope but cannot determine
     # whether it complies with END-02.
-    evidence_issue_mask = (
-        devices['company_managed'].isna()
-        | (
-            (devices['company_managed'] == True)
-            & devices['endpoint_protection'].isna()
-        )
+    evidence_issue_mask = devices["company_managed"].isna() | (
+        (devices["company_managed"] == True) & devices["endpoint_protection"].isna()
     )
 
     # Keep records with insufficient END-02 evidence separate
@@ -319,18 +279,16 @@ def assess_end_02(devices):
 
     # The assessable population consists only of company-managed
     # devices whose endpoint-protection status is known.
-    assessable_mask = (
-        (devices['company_managed'] == True)
-        & devices['endpoint_protection'].notna()
-    )
+    assessable_mask = (devices["company_managed"] == True) & devices[
+        "endpoint_protection"
+    ].notna()
 
     assessable_population = devices[assessable_mask]
 
     # A confirmed END-02 exception exists when the device is
     # company-managed but endpoint protection is not enabled.
-    exception_mask = (
-        (devices['company_managed'] == True)
-        & (devices['endpoint_protection'] == False)
+    exception_mask = (devices["company_managed"] == True) & (
+        devices["endpoint_protection"] == False
     )
 
     exceptions = devices[exception_mask]
@@ -340,11 +298,7 @@ def assess_end_02(devices):
     return exceptions, evidence_issues, assessable_population
 
 
-
-# ------------------------------------------------------------------
-# THIRD-PARTY RISK (TPR) CONTROLS
-# ------------------------------------------------------------------
-
+# Third-Party Risk (TPR)
 def assess_tpr_01(vendors):
     """
     Assess critical third-party vendors for documented
@@ -371,10 +325,10 @@ def assess_tpr_01(vendors):
     # A critical vendor with missing security_review_completed
     # evidence cannot yet be assessed for compliance.
     evidence_issues = vendors[
-        vendors['critical_vendor'].isna()
+        vendors["critical_vendor"].isna()
         | (
-            (vendors['critical_vendor'] == True)
-            & vendors['security_review_completed'].isna()
+            (vendors["critical_vendor"] == True)
+            & vendors["security_review_completed"].isna()
         )
     ]
 
@@ -383,8 +337,8 @@ def assess_tpr_01(vendors):
     # TPR-01 applies only to critical vendors, and their
     # security-review status must be known.
     assessable_population = vendors[
-        (vendors['critical_vendor'] == True)
-        & vendors['security_review_completed'].notna()
+        (vendors["critical_vendor"] == True)
+        & vendors["security_review_completed"].notna()
     ]
 
     # Identify confirmed control exceptions.
@@ -392,7 +346,7 @@ def assess_tpr_01(vendors):
     # A critical vendor is an exception when the available
     # evidence confirms that a security review was not completed.
     exceptions = assessable_population[
-        assessable_population['security_review_completed'] == False
+        assessable_population["security_review_completed"] == False
     ]
 
     return exceptions, evidence_issues, assessable_population
@@ -423,11 +377,8 @@ def assess_tpr_02(vendors):
     # A privileged vendor with missing mfa_enabled evidence
     # cannot yet be assessed for compliance.
     evidence_issues = vendors[
-        vendors['privileged_access'].isna()
-        | (
-            (vendors['privileged_access'] == True)
-            & vendors['mfa_enabled'].isna()
-        )
+        vendors["privileged_access"].isna()
+        | ((vendors["privileged_access"] == True) & vendors["mfa_enabled"].isna())
     ]
 
     # Build the population that can actually be assessed.
@@ -435,18 +386,13 @@ def assess_tpr_02(vendors):
     # TPR-02 applies only to vendors with privileged access,
     # and their MFA status must be known.
     assessable_population = vendors[
-        (vendors['privileged_access'] == True)
-        & vendors['mfa_enabled'].notna()
+        (vendors["privileged_access"] == True) & vendors["mfa_enabled"].notna()
     ]
 
     # Identify confirmed control exceptions.
     #
     # A privileged vendor is an exception when the available
     # evidence confirms that MFA is not enabled.
-    exceptions = assessable_population[
-        assessable_population['mfa_enabled'] == False
-    ]
+    exceptions = assessable_population[assessable_population["mfa_enabled"] == False]
 
     return exceptions, evidence_issues, assessable_population
-
-

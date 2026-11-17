@@ -1,9 +1,11 @@
+"""Tests for HTML escaping and report output security."""
+
 from html import escape
 
 from src.reporting import (
     format_html_control_results,
     format_html_evidence_comparison,
-    format_html_report
+    format_html_report,
 )
 
 

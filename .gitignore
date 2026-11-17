@@ -16,3 +16,6 @@ __pycache__/
 
 # Local VS Code editor preferences
 .vscode/
+
+# Local AI agent skills and environment-specific symlinks
+.agents/

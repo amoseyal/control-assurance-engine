@@ -1,22 +1,22 @@
-
 """Tests for assessment workspace application logic
 and its Data Transfer Objects (DTOs).
 """
-import pytest
 
 from datetime import date
 
-from src.assessment_service import create_assessment
-from src.assessment_models import(
+import pytest
+
+from src.assessment_models import (
     Assessment,
     ControlAssessment,
     Finding,
 )
+from src.assessment_service import create_assessment
 from src.assessment_workspace import (
-    AssessmentSummary,
-    get_assessment_summaries,
-    get_assessment_detail,
     AssessmentDetail,
+    AssessmentSummary,
+    get_assessment_detail,
+    get_assessment_summaries,
 )
 
 
@@ -25,27 +25,27 @@ def test_get_assessment_summaries_returns_sorted_dtos(tmp_path):
     into correctly populated and sorted summary DTOs.
     """
     # Create an isolated storage directory.
-    storage_directory = tmp_path / 'assessments'
+    storage_directory = tmp_path / "assessments"
     storage_directory.mkdir()
 
     # Define two assessments in reverse identifier order.
     assessments = [
         Assessment(
-            assessment_id='ASM-2026-002',
-            organization='Southridge Technologies',
-            assessor='Security Analyst',
+            assessment_id="ASM-2026-002",
+            organization="Southridge Technologies",
+            assessor="Security Analyst",
             assessment_date=date(2026, 11, 5),
-            framework='ISO/IEC 27001:2022',
-            scope='Information security management system',
+            framework="ISO/IEC 27001:2022",
+            scope="Information security management system",
         ),
         Assessment(
-            assessment_id='ASM-2026-001',
-            organization='Northstar BuildCo',
-            assessor='Security Analyst',
+            assessment_id="ASM-2026-001",
+            organization="Northstar BuildCo",
+            assessor="Security Analyst",
             assessment_date=date(2026, 11, 1),
-            framework='NIST CSF 2.0',
-            scope='Enterprise cybersecurity controls',
-        )
+            framework="NIST CSF 2.0",
+            scope="Enterprise cybersecurity controls",
+        ),
     ]
 
     # Persist both records using the assessment service.
@@ -62,34 +62,29 @@ def test_get_assessment_summaries_returns_sorted_dtos(tmp_path):
 
     # Verify the correct number and DTO types.
     assert len(summaries) == 2
-    assert all(
-        isinstance(summary, AssessmentSummary)
-        for summary in summaries
-    )
+    assert all(isinstance(summary, AssessmentSummary) for summary in summaries)
 
     # Verify alphabetical ordering by assessment identifier.
-    assert [
-        summary.assessment_id for summary in summaries
-    ] == [
-        'ASM-2026-001',
-        'ASM-2026-002',
+    assert [summary.assessment_id for summary in summaries] == [
+        "ASM-2026-001",
+        "ASM-2026-002",
     ]
 
     # Verify that assessment metadata was transferred correctly.
     assert summaries[0] == AssessmentSummary(
-        assessment_id='ASM-2026-001',
-        organization='Northstar BuildCo',
+        assessment_id="ASM-2026-001",
+        organization="Northstar BuildCo",
         assessment_date=date(2026, 11, 1),
-        framework='NIST CSF 2.0',
-        scope='Enterprise cybersecurity controls',
+        framework="NIST CSF 2.0",
+        scope="Enterprise cybersecurity controls",
     )
 
     assert summaries[1] == AssessmentSummary(
-        assessment_id='ASM-2026-002',
-        organization='Southridge Technologies',
+        assessment_id="ASM-2026-002",
+        organization="Southridge Technologies",
         assessment_date=date(2026, 11, 5),
-        framework='ISO/IEC 27001:2022',
-        scope='Information security management system',
+        framework="ISO/IEC 27001:2022",
+        scope="Information security management system",
     )
 
     # Verify that retrieving summaries did not modify storage.
@@ -188,8 +183,8 @@ def test_get_assessment_detail_rejects_invalid_identifier(tmp_path):
 
 
 def test_get_assessment_detail_propagates_unrelated_file_error(
-        tmp_path,
-        monkeypatch,
+    tmp_path,
+    monkeypatch,
 ):
     """Propagate missing-file errors unrelated to the assessment,"""
 
@@ -208,9 +203,10 @@ def test_get_assessment_detail_propagates_unrelated_file_error(
     with pytest.raises(FileNotFoundError):
         get_assessment_detail("ASM-2026-001", tmp_path)
 
+
 def test_get_assessment_detail_retuns_none_with_default_directory(
-        tmp_path,
-        monkeypatch,
+    tmp_path,
+    monkeypatch,
 ):
     """Return None for a missing assessment in the default directory."""
 
@@ -265,11 +261,11 @@ def test_assessment_detail_counts_findings_by_severity():
     )
 
     risk_ratings = (
-        (1, 2), # LOW
-        (2, 3), # MODERATE
-        (4, 4), # HIGH
-        (3, 5), # HIGH
-        (5, 5), # CRITICAL
+        (1, 2),  # LOW
+        (2, 3),  # MODERATE
+        (4, 4),  # HIGH
+        (3, 5),  # HIGH
+        (5, 5),  # CRITICAL
     )
 
     findings = tuple(

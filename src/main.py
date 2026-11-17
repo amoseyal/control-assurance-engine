@@ -1,79 +1,58 @@
-from pathlib import Path
+"""
+Run the Control Assurance Engine command-line assessment.
+
+Load security evidence, evaluate controls, and generate
+risk findings and management reports.
+"""
+
 from datetime import datetime
+from pathlib import Path
 
-# Import the evidence loaders responsible for reading and validating
-# Northstar's user-account and endpoint evidence.
-from src.evidence import (
-    load_user_evidence,
-    load_device_evidence,
-    load_vendor_evidence
-)
-
-# Import the control-assessment functions used by the engine.
+from src.control_catalog import CONTROL_CATALOG
 from src.controls import (
+    assess_end_01,
+    assess_end_02,
     assess_iam_01,
     assess_iam_02,
     assess_iam_03,
-    assess_end_01,
-    assess_end_02,
     assess_tpr_01,
-    assess_tpr_02
+    assess_tpr_02,
 )
-
-# Import the reporting function that converts assessment results
-# into a structured GRC control finding.
+from src.evidence import load_device_evidence, load_user_evidence, load_vendor_evidence
 from src.reporting import (
     build_control_finding,
-    format_control_finding,
     build_executive_summary,
-    format_executive_summary,
+    build_findings_dataframe,
     build_management_findings,
+    export_findings_csv,
+    export_management_report,
+    format_control_finding,
+    format_executive_summary,
+    format_html_report,
     format_management_findings,
     generate_management_report,
-    export_management_report,
-    build_findings_dataframe,
-    export_findings_csv,
-    format_html_report,
 )
 
-# Import the centralized control metadata catalog.
-from src.control_catalog import CONTROL_CATALOG
-
-
-# Define the location of Northstar's evidence files.
-#
-# Path() provides a clean and portable way to work with filesystem paths.
-USER_EVIDENCE_FILE = Path('data/users.csv')
-DEVICE_EVIDENCE_FILE = Path('data/devices.csv')
-
-# Third-party vendor evidence supports the TPR control domain.
-VENDOR_EVIDENCE_FILE = Path('data/vendors.csv')
-
-# Define the location for the consolidated control-findings report.
-CONTROL_FINDINGS_FILE = Path('output/control_findings.csv')
-
-# Management-facing Markdown assessment report.
-MANAGEMENT_REPORT_FILE = Path('output/management_report.md')
-
-# Browser-based management report used for enhanced
-# presentation and visual reporting.
-HTML_MANAGEMENT_REPORT_FILE = Path('output/management_report.html')
+# File paths
+USER_EVIDENCE_FILE = Path("data/users.csv")
+DEVICE_EVIDENCE_FILE = Path("data/devices.csv")
+VENDOR_EVIDENCE_FILE = Path("data/vendors.csv")
+CONTROL_FINDINGS_FILE = Path("output/control_findings.csv")
+MANAGEMENT_REPORT_FILE = Path("output/management_report.md")
+HTML_MANAGEMENT_REPORT_FILE = Path("output/management_report.html")
 
 # Record the date on which the assessment is executed.
 # Building the string manually avoids platform-specific strftime
 # directives for displaying the day without a leading zero.
 today = datetime.now()
 
-ASSESSMENT_DATE = (
-    f'{today.strftime("%B")} {today.day}, {today.year}'
-)
+ASSESSMENT_DATE = f"{today.strftime('%B')} {today.day}, {today.year}"
 
 ASSESSMENT_SCOPE = (
-    'Identity and Access Management, Endpoint Security, '
-    'and Third-Party Risk'
+    "Identity and Access Management, Endpoint Security, and Third-Party Risk"
 )
 
-FRAMEWORK_ALIGNMENT = 'NIST Cybersecurity Framework (CSF) 2.0'
+FRAMEWORK_ALIGNMENT = "NIST Cybersecurity Framework (CSF) 2.0"
 
 
 def main():
@@ -81,15 +60,10 @@ def main():
     Run the Control Assurance Engine against Northstar's user evidence.
     """
 
-    # ------------------------------------------------------------------
-    # EVIDENCE INGESTION
-    # ------------------------------------------------------------------
+    # Evidence ingestion
 
-    # Load and validate Northstar's endpoint evidence.
-    #
-    # Before returning the DataFrame, load_user_evidence() verifies that:
-    # - all required columns exist
-    # - Boolean fields contain valid values
+    # Load and validate user-account evidence, including required
+    # columns and Boolean field values.
     users = load_user_evidence(USER_EVIDENCE_FILE)
 
     # Device evidence is maintained separately from user evidence because
@@ -100,350 +74,209 @@ def main():
     # risk controls operate against Northstar's external vendor population.
     vendors = load_vendor_evidence(VENDOR_EVIDENCE_FILE)
 
+    # IAM-01 assessment
 
+    # Evaluate MFA compliance for active user accounts.
+    # Separate confirmed exceptions from evidence-quality issues.
+    iam_01_exceptions, iam_01_evidence_issues, iam_01_population = assess_iam_01(users)
 
-    # ------------------------------------------------------------------
-    # IAM-01 ASSESSMENT
-    # ------------------------------------------------------------------
+    iam_01_control = CONTROL_CATALOG["IAM-01"]
 
-    # Assess IAM-01:
-    # All active user accounts must have MFA enabled.
-    #
-    # The control returns:
-    # - confirmed control exceptions
-    # - evidence-quality issues
-    # - the assessable control population
-    iam_01_exceptions, iam_01_evidence_issues, iam_01_population = (
-        assess_iam_01(users)
-    )
-
-    # Retrieve IAM-01 metadata from the centralized control catalog.
-    iam_01_control = CONTROL_CATALOG['IAM-01']
-
-    # Build the structured finding using the catalog metadata and
-    # the assessment results produced by the IAM-01 control logic.
+    # Combine assessment results with catalog metadata to build
+    # the structured control finding.
     iam_01_finding = build_control_finding(
-        control_id=iam_01_control['control_id'],
-        requirement=iam_01_control['requirement'],
-
-        # Pass the control-specific management context from the
-        # centralized catalog into the structured finding.
-        finding_description=iam_01_control['finding_description'],
-        recommendation=iam_01_control['recommendation'],
-
+        control_id=iam_01_control["control_id"],
+        requirement=iam_01_control["requirement"],
+        finding_description=iam_01_control["finding_description"],
+        recommendation=iam_01_control["recommendation"],
         assessable_population=iam_01_population,
         exceptions=iam_01_exceptions,
         evidence_issues=iam_01_evidence_issues,
-
-        # Pass the control's NIST CSF 2.0 mapping from the
-        # centralized control catalog into the finding.
-        nist_csf_function=iam_01_control['nist_csf_function'],
-        nist_csf_category=iam_01_control['nist_csf_category'],
-        nist_csf_category_name=iam_01_control['nist_csf_category_name'],
-        nist_csf_subcategory=iam_01_control['nist_csf_subcategory'],
-        nist_csf_subcategory_outcome=iam_01_control['nist_csf_subcategory_outcome'],
-
-        # Include the control's baseline risk ratings so that
-        # failed controls can be assigned a finding severity.
-        likelihood=CONTROL_CATALOG['IAM-01']['likelihood'],
-        impact=CONTROL_CATALOG['IAM-01']['impact']
+        nist_csf_function=iam_01_control["nist_csf_function"],
+        nist_csf_category=iam_01_control["nist_csf_category"],
+        nist_csf_category_name=iam_01_control["nist_csf_category_name"],
+        nist_csf_subcategory=iam_01_control["nist_csf_subcategory"],
+        nist_csf_subcategory_outcome=iam_01_control["nist_csf_subcategory_outcome"],
+        likelihood=CONTROL_CATALOG["IAM-01"]["likelihood"],
+        impact=CONTROL_CATALOG["IAM-01"]["impact"],
     )
 
+    # IAM-02 assessment
 
+    # Evaluate whether terminated user accounts have been disabled.
+    # Reuse validated user evidence with a different assessment scope.
+    iam_02_exceptions, iam_02_evidence_issues, iam_02_population = assess_iam_02(users)
 
-    # ------------------------------------------------------------------
-    # IAM-02 ASSESSMENT
-    # ------------------------------------------------------------------
+    iam_02_control = CONTROL_CATALOG["IAM-02"]
 
-    # Assess IAM-02:
-    # Terminated users must have their accounts disabled.
-    #
-    # IAM-02 uses the same validated user evidence but applies
-    # a different control requirement and scope.
-    iam_02_exceptions, iam_02_evidence_issues, iam_02_population = (
-        assess_iam_02(users)
-    )
-
-    # Retrieve IAM-02 metadata from the centralized control catalog.
-    iam_02_control = CONTROL_CATALOG['IAM-02']
-
-    # Build the structured finding using the catalog metadata and
-    # the assessment results produced by the IAM-02 control logic.
+    # Combine assessment results with catalog metadata to build
+    # the structured control finding.
     iam_02_finding = build_control_finding(
-        control_id=iam_02_control['control_id'],
-        requirement=iam_02_control['requirement'],
-
-        # Pass the control-specific management context from the
-        # centralized catalog into the structured finding.
-        finding_description=iam_02_control['finding_description'],
-        recommendation=iam_02_control['recommendation'],
-
+        control_id=iam_02_control["control_id"],
+        requirement=iam_02_control["requirement"],
+        finding_description=iam_02_control["finding_description"],
+        recommendation=iam_02_control["recommendation"],
         assessable_population=iam_02_population,
         exceptions=iam_02_exceptions,
         evidence_issues=iam_02_evidence_issues,
-
-        # Pass the control's NIST CSF 2.0 mapping from the
-        # centralized control catalog into the finding.
-        nist_csf_function=iam_02_control['nist_csf_function'],
-        nist_csf_category=iam_02_control['nist_csf_category'],
-        nist_csf_category_name=iam_02_control['nist_csf_category_name'],
-        nist_csf_subcategory=iam_02_control['nist_csf_subcategory'],
-        nist_csf_subcategory_outcome=iam_02_control['nist_csf_subcategory_outcome'],
-
-        # Include the control's baseline risk ratings so that
-        # failed controls can be assigned a finding severity.
-        likelihood=CONTROL_CATALOG['IAM-02']['likelihood'],
-        impact=CONTROL_CATALOG['IAM-02']['impact']
+        nist_csf_function=iam_02_control["nist_csf_function"],
+        nist_csf_category=iam_02_control["nist_csf_category"],
+        nist_csf_category_name=iam_02_control["nist_csf_category_name"],
+        nist_csf_subcategory=iam_02_control["nist_csf_subcategory"],
+        nist_csf_subcategory_outcome=iam_02_control["nist_csf_subcategory_outcome"],
+        likelihood=CONTROL_CATALOG["IAM-02"]["likelihood"],
+        impact=CONTROL_CATALOG["IAM-02"]["impact"],
     )
 
+    # IAM-03 assessment
 
+    # Evaluate whether administrative privileges have documented approval.
+    # Identify unauthorized privileges and evidence-quality issues.
+    iam_03_exceptions, iam_03_evidence_issues, iam_03_population = assess_iam_03(users)
 
-    # ------------------------------------------------------------------
-    # IAM-03 ASSESSMENT
-    # ------------------------------------------------------------------
+    iam_03_control = CONTROL_CATALOG["IAM-03"]
 
-    # Assess IAM-03:
-    # Administrative privileges must be limited to approved accounts.
-    #
-    # IAM-03 evaluates accounts with administrative privileges and
-    # determines whether those privileges have documented approval.
-    iam_03_exceptions, iam_03_evidence_issues, iam_03_population = (
-        assess_iam_03(users)
-    )
-
-    # Retrieve IAM-03 metadata from the centralized control catalog.
-    iam_03_control = CONTROL_CATALOG['IAM-03']
-
-    # Build the structured finding using the catalog metadata and
-    # the assessment results produced by the IAM-03 control logic.
+    # Combine assessment results with catalog metadata to build
+    # the structured control finding.
     iam_03_finding = build_control_finding(
-        control_id=iam_03_control['control_id'],
-        requirement=iam_03_control['requirement'],
-
-        # Pass the control-specific management context from the
-        # centralized catalog into the structured finding.
-        finding_description=iam_03_control['finding_description'],
-        recommendation=iam_03_control['recommendation'],
-
+        control_id=iam_03_control["control_id"],
+        requirement=iam_03_control["requirement"],
+        finding_description=iam_03_control["finding_description"],
+        recommendation=iam_03_control["recommendation"],
         assessable_population=iam_03_population,
         exceptions=iam_03_exceptions,
         evidence_issues=iam_03_evidence_issues,
-
-        # Pass the control's NIST CSF 2.0 mapping from the
-        # centralized control catalog into the finding.
-        nist_csf_function=iam_03_control['nist_csf_function'],
-        nist_csf_category=iam_03_control['nist_csf_category'],
-        nist_csf_category_name=iam_03_control['nist_csf_category_name'],
-        nist_csf_subcategory=iam_03_control['nist_csf_subcategory'],
-        nist_csf_subcategory_outcome=iam_03_control['nist_csf_subcategory_outcome'],
-
-        # Include the control's baseline risk ratings so that
-        # failed controls can be assigned a finding severity.
-        likelihood=CONTROL_CATALOG['IAM-03']['likelihood'],
-        impact=CONTROL_CATALOG['IAM-03']['impact']
+        nist_csf_function=iam_03_control["nist_csf_function"],
+        nist_csf_category=iam_03_control["nist_csf_category"],
+        nist_csf_category_name=iam_03_control["nist_csf_category_name"],
+        nist_csf_subcategory=iam_03_control["nist_csf_subcategory"],
+        nist_csf_subcategory_outcome=iam_03_control["nist_csf_subcategory_outcome"],
+        likelihood=CONTROL_CATALOG["IAM-03"]["likelihood"],
+        impact=CONTROL_CATALOG["IAM-03"]["impact"],
     )
 
+    # END-01 assessment
 
-
-    # ------------------------------------------------------------------
-    # END-01 ASSESSMENT
-    # ------------------------------------------------------------------
-
-    # Assess END-01:
-    # Company-managed endpoints must use disk encryption.
-    #
-    # The control evaluates company-managed devices and determines
-    # whether full-disk encryption is enabled.
-    end_01_exceptions, end_01_evidence_issues, end_01_population = (
-        assess_end_01(devices)
+    # Evaluate full-disk encryption compliance for company-managed devices.
+    # Separate confirmed exceptions from evidence-quality issues.
+    end_01_exceptions, end_01_evidence_issues, end_01_population = assess_end_01(
+        devices
     )
 
-    # Retrieve END-01 metadata from the centralized control catalog.
-    end_01_control = CONTROL_CATALOG['END-01']
+    end_01_control = CONTROL_CATALOG["END-01"]
 
-    # Build the structured finding using the catalog metadata and
-    # the assessment results produced by the END-01 control logic.
+    # Combine assessment results with catalog metadata to build
+    # the structured control finding.
     end_01_finding = build_control_finding(
-        control_id=end_01_control['control_id'],
-        requirement=end_01_control['requirement'],
-
-        # Pass the control-specific management context from the
-        # centralized catalog into the structured finding.
-        finding_description=end_01_control['finding_description'],
-        recommendation=end_01_control['recommendation'],
-
+        control_id=end_01_control["control_id"],
+        requirement=end_01_control["requirement"],
+        finding_description=end_01_control["finding_description"],
+        recommendation=end_01_control["recommendation"],
         assessable_population=end_01_population,
         exceptions=end_01_exceptions,
         evidence_issues=end_01_evidence_issues,
-        identifier_column='device_id',
-
-        # Pass the control's NIST CSF 2.0 mapping from the
-        # centralized control catalog into the finding.
-        nist_csf_function=end_01_control['nist_csf_function'],
-        nist_csf_category=end_01_control['nist_csf_category'],
-        nist_csf_category_name=end_01_control['nist_csf_category_name'],
-        nist_csf_subcategory=end_01_control['nist_csf_subcategory'],
-        nist_csf_subcategory_outcome=end_01_control['nist_csf_subcategory_outcome'],
-
-        # Include the control's baseline risk ratings so that
-        # failed controls can be assigned a finding severity.
-        likelihood=CONTROL_CATALOG['END-01']['likelihood'],
-        impact=CONTROL_CATALOG['END-01']['impact']
+        identifier_column="device_id",
+        nist_csf_function=end_01_control["nist_csf_function"],
+        nist_csf_category=end_01_control["nist_csf_category"],
+        nist_csf_category_name=end_01_control["nist_csf_category_name"],
+        nist_csf_subcategory=end_01_control["nist_csf_subcategory"],
+        nist_csf_subcategory_outcome=end_01_control["nist_csf_subcategory_outcome"],
+        likelihood=CONTROL_CATALOG["END-01"]["likelihood"],
+        impact=CONTROL_CATALOG["END-01"]["impact"],
     )
 
+    # END-02 assessment
 
-
-    # ------------------------------------------------------------------
-    # END-02 ASSESSMENT
-    # ------------------------------------------------------------------
-
-    # Assess END-02:
-    # Company-managed endpoints must have endpoint protection enabled.
-    #
-    # Only company-managed devices with known endpoint-protection
-    # status are included in the assessable population.
-    end_02_exceptions, end_02_evidence_issues, end_02_population = (
-        assess_end_02(devices)
+    # Evaluate endpoint protection compliance for company-managed devices.
+    # Include only devices with known protection status in the assessable population.
+    end_02_exceptions, end_02_evidence_issues, end_02_population = assess_end_02(
+        devices
     )
 
-    # Retrieve END-02 metadata from the centralized control catalog.
-    end_02_control = CONTROL_CATALOG['END-02']
+    end_02_control = CONTROL_CATALOG["END-02"]
 
-    # Build the structured finding using the catalog metadata and
-    # the assessment results produced by the END-02 control logic.
+    # Combine assessment results with catalog metadata to build
+    # the structured control finding.
     end_02_finding = build_control_finding(
-        control_id=end_02_control['control_id'],
-        requirement=end_02_control['requirement'],
-
-        # Pass the control-specific management context from the
-        # centralized catalog into the structured finding.
-        finding_description=end_02_control['finding_description'],
-        recommendation=end_02_control['recommendation'],
-
+        control_id=end_02_control["control_id"],
+        requirement=end_02_control["requirement"],
+        finding_description=end_02_control["finding_description"],
+        recommendation=end_02_control["recommendation"],
         assessable_population=end_02_population,
         exceptions=end_02_exceptions,
         evidence_issues=end_02_evidence_issues,
-        identifier_column='device_id',
-
-        # Pass the control's NIST CSF 2.0 mapping from the
-        # centralized control catalog into the finding.
-        nist_csf_function=end_02_control['nist_csf_function'],
-        nist_csf_category=end_02_control['nist_csf_category'],
-        nist_csf_category_name=end_02_control['nist_csf_category_name'],
-        nist_csf_subcategory=end_02_control['nist_csf_subcategory'],
-        nist_csf_subcategory_outcome=end_02_control['nist_csf_subcategory_outcome'],
-
-        # Include the control's baseline risk ratings so that
-        # failed controls can be assigned a finding severity.
-        likelihood=CONTROL_CATALOG['END-02']['likelihood'],
-        impact=CONTROL_CATALOG['END-02']['impact']
+        identifier_column="device_id",
+        nist_csf_function=end_02_control["nist_csf_function"],
+        nist_csf_category=end_02_control["nist_csf_category"],
+        nist_csf_category_name=end_02_control["nist_csf_category_name"],
+        nist_csf_subcategory=end_02_control["nist_csf_subcategory"],
+        nist_csf_subcategory_outcome=end_02_control["nist_csf_subcategory_outcome"],
+        likelihood=CONTROL_CATALOG["END-02"]["likelihood"],
+        impact=CONTROL_CATALOG["END-02"]["impact"],
     )
 
+    # TPR-01 assessment
 
-
-    # ------------------------------------------------------------------
-    # TPR-01 ASSESSMENT
-    # ------------------------------------------------------------------
-
-    # Assess TPR-01:
-    # Critical third-party vendors must have a documented security review.
-    #
-    # The control evaluates vendors classified as critical and determines
-    # whether a documented security review has been completed.
-    tpr_01_exceptions, tpr_01_evidence_issues, tpr_01_population = (
-        assess_tpr_01(vendors)
+    # Evaluate whether critical vendors have completed security reviews.
+    # Separate confirmed exceptions from evidence-quality issues.
+    tpr_01_exceptions, tpr_01_evidence_issues, tpr_01_population = assess_tpr_01(
+        vendors
     )
 
-    # Retrieve TPR-01 metadata from the centralized control catalog.
-    tpr_01_control = CONTROL_CATALOG['TPR-01']
+    tpr_01_control = CONTROL_CATALOG["TPR-01"]
 
-    # Build the structured finding using the catalog metadata and
-    # the assessment results produced by the TPR-01 control logic.
+    # Combine assessment results with catalog metadata to build
+    # the structured control finding.
     tpr_01_finding = build_control_finding(
-        control_id=tpr_01_control['control_id'],
-        requirement=tpr_01_control['requirement'],
-
-        # Pass the control-specific management context from the
-        # centralized catalog into the structured finding.
-        finding_description=tpr_01_control['finding_description'],
-        recommendation=tpr_01_control['recommendation'],
-
+        control_id=tpr_01_control["control_id"],
+        requirement=tpr_01_control["requirement"],
+        finding_description=tpr_01_control["finding_description"],
+        recommendation=tpr_01_control["recommendation"],
         assessable_population=tpr_01_population,
         exceptions=tpr_01_exceptions,
         evidence_issues=tpr_01_evidence_issues,
-
-        # Vendor IDs identify the affected third-party entities
-        # in the structured finding.
-        identifier_column='vendor_id',
-
-        # Pass the control's NIST CSF 2.0 mapping from the
-        # centralized control catalog into the finding.
-        nist_csf_function=tpr_01_control['nist_csf_function'],
-        nist_csf_category=tpr_01_control['nist_csf_category'],
-        nist_csf_category_name=tpr_01_control['nist_csf_category_name'],
-        nist_csf_subcategory=tpr_01_control['nist_csf_subcategory'],
-        nist_csf_subcategory_outcome=tpr_01_control['nist_csf_subcategory_outcome'],
-
-        # Include the control's baseline risk ratings so that
-        # a failed TPR-01 control can be assigned a finding severity.
-        likelihood=tpr_01_control['likelihood'],
-        impact=tpr_01_control['impact']
+        identifier_column="vendor_id",
+        nist_csf_function=tpr_01_control["nist_csf_function"],
+        nist_csf_category=tpr_01_control["nist_csf_category"],
+        nist_csf_category_name=tpr_01_control["nist_csf_category_name"],
+        nist_csf_subcategory=tpr_01_control["nist_csf_subcategory"],
+        nist_csf_subcategory_outcome=tpr_01_control["nist_csf_subcategory_outcome"],
+        likelihood=tpr_01_control["likelihood"],
+        impact=tpr_01_control["impact"],
     )
 
+    # TPR-02 assessment
 
-
-    # ------------------------------------------------------------------
-    # TPR-02 ASSESSMENT
-    # ------------------------------------------------------------------
-
-    # Assess TPR-02:
-    # Third-party vendors with privileged access must use MFA.
-    #
-    # The control evaluates vendors with privileged access and
-    # determines whether MFA is enabled for that access.
-    tpr_02_exceptions, tpr_02_evidence_issues, tpr_02_population = (
-        assess_tpr_02(vendors)
+    # Evaluate MFA compliance for vendors with privileged access.
+    # Separate confirmed exceptions from evidence-quality issues.
+    tpr_02_exceptions, tpr_02_evidence_issues, tpr_02_population = assess_tpr_02(
+        vendors
     )
 
-    # Retrieve TPR-02 metadata from the centralized control catalog.
-    tpr_02_control = CONTROL_CATALOG['TPR-02']
+    tpr_02_control = CONTROL_CATALOG["TPR-02"]
 
-    # Build the structured finding using the catalog metadata and
-    # the assessment results produced by the TPR-02 control logic.
+    # Combine assessment results with catalog metadata to build
+    # the structured control finding.
     tpr_02_finding = build_control_finding(
-        control_id=tpr_02_control['control_id'],
-        requirement=tpr_02_control['requirement'],
-
-        # Pass the control-specific management context from the
-        # centralized catalog into the structured finding.
-        finding_description=tpr_02_control['finding_description'],
-        recommendation=tpr_02_control['recommendation'],
-
+        control_id=tpr_02_control["control_id"],
+        requirement=tpr_02_control["requirement"],
+        finding_description=tpr_02_control["finding_description"],
+        recommendation=tpr_02_control["recommendation"],
         assessable_population=tpr_02_population,
         exceptions=tpr_02_exceptions,
         evidence_issues=tpr_02_evidence_issues,
-        identifier_column='vendor_id',
-        nist_csf_function=tpr_02_control['nist_csf_function'],
-        nist_csf_category=tpr_02_control['nist_csf_category'],
-        nist_csf_category_name=tpr_02_control['nist_csf_category_name'],
-        nist_csf_subcategory=tpr_02_control['nist_csf_subcategory'],
-        nist_csf_subcategory_outcome=tpr_02_control[
-            'nist_csf_subcategory_outcome'
-        ],
-        likelihood=tpr_02_control['likelihood'],
-        impact=tpr_02_control['impact']
+        identifier_column="vendor_id",
+        nist_csf_function=tpr_02_control["nist_csf_function"],
+        nist_csf_category=tpr_02_control["nist_csf_category"],
+        nist_csf_category_name=tpr_02_control["nist_csf_category_name"],
+        nist_csf_subcategory=tpr_02_control["nist_csf_subcategory"],
+        nist_csf_subcategory_outcome=tpr_02_control["nist_csf_subcategory_outcome"],
+        likelihood=tpr_02_control["likelihood"],
+        impact=tpr_02_control["impact"],
     )
 
+    # Consolidated findings and reporting
 
-
-    # ============================================================
-    # CONSOLIDATED FINDINGS EXPORT
-    # ============================================================
-
-    #Combine all structured control findings into a single collection.
-    #
-    # Keeping the findings together allows the reporting layer to
-    # convert the complete assessment into one tabular report.
     all_findings = [
         iam_01_finding,
         iam_02_finding,
@@ -451,338 +284,205 @@ def main():
         end_01_finding,
         end_02_finding,
         tpr_01_finding,
-        tpr_02_finding
+        tpr_02_finding,
     ]
 
-    # Build executive-level assessment metrics from the complete
-    # set of structured control findings.
     executive_summary = build_executive_summary(all_findings)
 
     # Display the executive-level assessment summary before the
     # detailed individual control findings.
-    print('\n## Executive Summary')
-    print('--------------------')
+    print("\n## Executive Summary")
+    print("--------------------")
     print(format_executive_summary(executive_summary))
 
-    # Convert the structured findings into a DataFrame suitable
-    # for reporting and export.
     findings_dataframe = build_findings_dataframe(all_findings)
 
-    # Export the consolidated findings to the project's output directory.
-    export_findings_csv(
-        findings_dataframe,
-        CONTROL_FINDINGS_FILE
-    )
+    export_findings_csv(findings_dataframe, CONTROL_FINDINGS_FILE)
 
-    # Build a remediation-focused management view containing only
-    # confirmed control failures.
+    # Include only confirmed control failures in the remediation report.
     management_findings = build_management_findings(all_findings)
 
-    # Display the failed controls that require management action.
-    print('\n## Findings Requiring Remediation')
-    print('---------------------------------')
+    print("\n## Findings Requiring Remediation")
+    print("---------------------------------")
     print(format_management_findings(management_findings))
 
-    # Generate the management-facing report with assessment
-    # context, executive metrics, and remediation findings.
     management_report = generate_management_report(
         executive_summary,
         management_findings,
         assessment_date=ASSESSMENT_DATE,
         assessment_scope=ASSESSMENT_SCOPE,
-        framework_alignment=FRAMEWORK_ALIGNMENT
+        framework_alignment=FRAMEWORK_ALIGNMENT,
     )
 
-    # Export the completed management report as a persistent
-    # Markdown deliverable.
-    export_management_report(
-        management_report,
-        MANAGEMENT_REPORT_FILE
-    )
+    export_management_report(management_report, MANAGEMENT_REPORT_FILE)
 
-    # Generate the browser-based HTML report using the complete
-    # assessment findings and the same assessment context used
-    # by the Markdown management report.
+    # Use the same assessment context for both report formats.
     html_management_report = format_html_report(
         all_findings,
         assessment_date=ASSESSMENT_DATE,
         assessment_scope=ASSESSMENT_SCOPE,
-        framework_alignment=FRAMEWORK_ALIGNMENT
+        framework_alignment=FRAMEWORK_ALIGNMENT,
     )
 
-    # Export the HTML report using the same format-neutral
-    # management-report export function.
-    export_management_report(
-        html_management_report,
-        HTML_MANAGEMENT_REPORT_FILE
-    )
+    export_management_report(html_management_report, HTML_MANAGEMENT_REPORT_FILE)
 
+    # IAM-01 output
 
-
-    # ------------------------------------------------------------------
-    # IAM-01 OUTPUT
-    # ------------------------------------------------------------------
-
-    # Display confirmed IAM-01 control exceptions.
-    print('\n## IAM-01 Control Exceptions')
-    print('---------------------------')
+    print("\n## IAM-01 Control Exceptions")
+    print("---------------------------")
 
     if iam_01_exceptions.empty:
-        print('No control exceptions identified.')
+        print("No control exceptions identified.")
     else:
-        print(iam_01_exceptions.to_string(index = False))
+        print(iam_01_exceptions.to_string(index=False))
 
-    # Display IAM-01 evidence-quality issues separately.
-    #
-    # This prevents incomplete evidence from being incorrectly
-    # reported as a confirmed control failure.
-    print('\n## IAM-01 Evidence Issues')
-    print('------------------------')
+    # Keep incomplete evidence separate from confirmed control failures.
+    print("\n## IAM-01 Evidence Issues")
+    print("------------------------")
 
     if iam_01_evidence_issues.empty:
-        print('No evidence issues identified.')
+        print("No evidence issues identified.")
     else:
-        print(iam_01_evidence_issues.to_string(index = False))
+        print(iam_01_evidence_issues.to_string(index=False))
 
-    # Display the summarized IAM-01 control finding.
-    print('\n## IAM-01 Control Finding')
-    print('------------------------')
+    print("\n## IAM-01 Control Finding")
+    print("------------------------")
 
-    # Format and display the structured IAM-01 finding.
-    print(
-        format_control_finding(
-            iam_01_finding,
-            iam_01_control['entity_label']
-        )
-    )
+    print(format_control_finding(iam_01_finding, iam_01_control["entity_label"]))
 
+    # IAM-02 output
 
-
-    # ------------------------------------------------------------------
-    # IAM-02 OUTPUT
-    # ------------------------------------------------------------------
-
-    # Display confirmed IAM-02 control exceptions.
-    print('\n## IAM-02 Control Exceptions')
-    print('----------------------------')
+    print("\n## IAM-02 Control Exceptions")
+    print("----------------------------")
 
     if iam_02_exceptions.empty:
-        print('No control exceptions identified.')
+        print("No control exceptions identified.")
     else:
-        print(iam_02_exceptions.to_string(index = False))
+        print(iam_02_exceptions.to_string(index=False))
 
-    # Display IAM-02 evidence-quality issues separately.
-    print('\n## IAM-02 Evidence Issues')
-    print('-------------------------')
+    print("\n## IAM-02 Evidence Issues")
+    print("-------------------------")
 
     if iam_02_evidence_issues.empty:
-        print('No evidence issues identified.')
+        print("No evidence issues identified.")
     else:
-        print(iam_02_evidence_issues.to_string(index = False))
+        print(iam_02_evidence_issues.to_string(index=False))
 
-    # Display the summarized IAM-02 control finding.
-    print('\n## IAM-02 Control Finding')
-    print('-------------------------')
+    print("\n## IAM-02 Control Finding")
+    print("-------------------------")
 
-    # Format and display the structured IAM-02 finding.
-    print(
-        format_control_finding(
-            iam_02_finding,
-            iam_02_control['entity_label']
-        )
-    )
+    print(format_control_finding(iam_02_finding, iam_02_control["entity_label"]))
 
+    # IAM-03 output
 
-
-    # ------------------------------------------------------------------
-    # IAM-03 OUTPUT
-    # ------------------------------------------------------------------
-
-    # Display confirmed IAM-03 control exceptions.
-    print('\n## IAM-03 Control Exceptions')
-    print('----------------------------')
+    print("\n## IAM-03 Control Exceptions")
+    print("----------------------------")
 
     if iam_03_exceptions.empty:
-        print('No control exceptions identified.')
+        print("No control exceptions identified.")
     else:
-        print(iam_03_exceptions.to_string(index = False))
+        print(iam_03_exceptions.to_string(index=False))
 
-    # Display IAM-03 evidence-quality issues separately.
-    print('\n## IAM-03 Evidence Issues')
-    print('-------------------------')
+    print("\n## IAM-03 Evidence Issues")
+    print("-------------------------")
 
     if iam_03_evidence_issues.empty:
-        print('No evidence issues identified.')
+        print("No evidence issues identified.")
     else:
-        print(iam_03_evidence_issues.to_string(index = False))
+        print(iam_03_evidence_issues.to_string(index=False))
 
-    # Display the summarized IAM-03 control finding.
-    print('\n## IAM-03 Control Finding')
-    print('-------------------------')
+    print("\n## IAM-03 Control Finding")
+    print("-------------------------")
 
-    # Format and display the structured IAM-03 finding.
-    print(
-        format_control_finding(
-            iam_03_finding,
-            iam_03_control['entity_label']
-        )
-    )
+    print(format_control_finding(iam_03_finding, iam_03_control["entity_label"]))
 
+    # END-01 output
 
-
-    # ------------------------------------------------------------------
-    # END-01 OUTPUT
-    # ------------------------------------------------------------------
-
-    # Display the raw END-01 assessment results.
-    #
-    # These are useful during development because they let us inspect
-    # exactly which endpoint records produced each result.
-    print('\n## END-01 Control Exceptions')
-    print('----------------------------')
+    # Display raw assessment results for troubleshooting and verification.
+    print("\n## END-01 Control Exceptions")
+    print("----------------------------")
     print(end_01_exceptions)
 
-    print('\n## END-01 Control Evidence Issues')
-    print('---------------------------------')
+    print("\n## END-01 Control Evidence Issues")
+    print("---------------------------------")
     print(end_01_evidence_issues)
 
-    # Display the structured END-01 finding in a readable format
-    # consistent with the IAM control findings.
-    print('\n## END-01 Control Finding')
-    print('-------------------------')
-    
-    # Format and display the structured END-01 finding.
-    print(
-        format_control_finding(
-            end_01_finding,
-            end_01_control['entity_label']
-        )
-    )
+    print("\n## END-01 Control Finding")
+    print("-------------------------")
 
+    print(format_control_finding(end_01_finding, end_01_control["entity_label"]))
 
+    # END-02 output
 
-    # ------------------------------------------------------------------
-    # END-02 OUTPUT
-    # ------------------------------------------------------------------
-
-    # Display confirmed END-02 control exceptions.
-    print('\n## END-02 Control Exceptions')
-    print('----------------------------')
+    print("\n## END-02 Control Exceptions")
+    print("----------------------------")
 
     if end_02_exceptions.empty:
-        print('No control exceptions identified.')
+        print("No control exceptions identified.")
     else:
         print(end_02_exceptions)
 
-    # Display END-02 evidence-quality issues separately from
-    # confirmed control exceptions.
-    print('\n## END-02 Evidence Issues')
-    print('-------------------------')
+    print("\n## END-02 Evidence Issues")
+    print("-------------------------")
 
     if end_02_evidence_issues.empty:
-        print('No evidence issues identified.')
+        print("No evidence issues identified.")
     else:
         print(end_02_evidence_issues)
 
-    # Display the structured END-02 finding.
-    print('\n## END-02 Control Finding')
-    print('-------------------------')
+    print("\n## END-02 Control Finding")
+    print("-------------------------")
 
-    # Format and display the structured END-02 finding.
-    print(
-        format_control_finding(
-            end_02_finding,
-            end_02_control['entity_label']
-        )
-    )
+    print(format_control_finding(end_02_finding, end_02_control["entity_label"]))
 
+    # TPR-01 output
 
-
-    # ------------------------------------------------------------------
-    # TPR-01 OUTPUT
-    # ------------------------------------------------------------------
-
-    # Display confirmed TPR-01 control exceptions.
-    print('\n## TPR-01 Control Exceptions')
-    print('----------------------------')
+    print("\n## TPR-01 Control Exceptions")
+    print("----------------------------")
 
     if tpr_01_exceptions.empty:
-        print('No control exceptions identified.')
+        print("No control exceptions identified.")
     else:
         print(tpr_01_exceptions.to_string(index=False))
 
-    # Display TPR-01 evidence-quality issues separately from
-    # confirmed control exceptions.
-    #
-    # A missing security-review status does not automatically
-    # establish that the vendor failed the control.
-    print('\n## TPR-01 Evidence Issues')
-    print('-------------------------')
+    # Missing security-review evidence does not establish control failure.
+    print("\n## TPR-01 Evidence Issues")
+    print("-------------------------")
 
     if tpr_01_evidence_issues.empty:
-        print('No evidence issues identified.')
+        print("No evidence issues identified.")
     else:
         print(tpr_01_evidence_issues.to_string(index=False))
 
-    # Display the structured TPR-01 finding.
-    print('\n## TPR-01 Control Finding')
-    print('-------------------------')
+    print("\n## TPR-01 Control Finding")
+    print("-------------------------")
 
-    # Format and display the structured TPR-01 finding using
-    # the vendor entity label defined in the control catalog.
-    print(
-        format_control_finding(
-            tpr_01_finding,
-            tpr_01_control['entity_label']
-        )
-    )
+    print(format_control_finding(tpr_01_finding, tpr_01_control["entity_label"]))
 
+    # TPR-02 output
 
-
-    # ------------------------------------------------------------------
-    # TPR-02 OUTPUT
-    # ------------------------------------------------------------------
-
-    # Display confirmed TPR-02 control exceptions.
-    print('\n## TPR-02 Control Exceptions')
-    print('----------------------------')
+    print("\n## TPR-02 Control Exceptions")
+    print("----------------------------")
 
     if tpr_02_exceptions.empty:
-        print('No control exceptions identified.')
+        print("No control exceptions identified.")
     else:
         print(tpr_02_exceptions.to_string(index=False))
 
-    # Display TPR-02 evidence-quality issues separately from
-    # confirmed control exceptions.
-    #
-    # A missing MFA status for a privileged vendor does not
-    # automatically establish that the vendor failed the control.
-    print('\n## TPR-02 Evidence Issues')
-    print('-------------------------')
+    # Missing MFA evidence does not establish control failure.
+    print("\n## TPR-02 Evidence Issues")
+    print("-------------------------")
 
     if tpr_02_evidence_issues.empty:
-        print('No evidence issues identified.')
+        print("No evidence issues identified.")
     else:
         print(tpr_02_evidence_issues.to_string(index=False))
 
-    # Display the structured TPR-02 finding.
-    print('\n## TPR-02 Control Finding')
-    print('-------------------------')
+    print("\n## TPR-02 Control Finding")
+    print("-------------------------")
 
-    # Format and display the structured TPR-02 finding using
-    # the vendor entity label defined in the control catalog.
-    print(
-        format_control_finding(
-            tpr_02_finding,
-            tpr_02_control['entity_label']
-        )
-    )
+    print(format_control_finding(tpr_02_finding, tpr_02_control["entity_label"]))
 
 
-
-# Run main() only when this module is executed directly.
-#
-# This prevents the assessment from automatically running if
-# src.main is imported by another Python module in the future.
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

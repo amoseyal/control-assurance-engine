@@ -1,10 +1,8 @@
-# ------------------------------------------------------------------
-# Risk-scoring functions for the Control Assurance Engine.
-# ------------------------------------------------------------------
-
 """
-This module contains logic for calculating and classifying
-risk associated with control-assessment findings.
+Calculate and classify cybersecurity assessment risk.
+
+Provide risk-scoring and severity-classification logic
+for findings generated during control assessments.
 """
 
 
@@ -25,9 +23,13 @@ def calculate_risk_score(likelihood, impact):
         The calculated risk score.
 
     Raises:
-        ValueError:
+        TypeError:
             If likelihood or impact is not an integer or is
-            outside the permitted 1-to-5 rating scale.
+            a boolean.
+
+        ValueError:
+            If likelihood or impact is outside the
+            permitted 1-to-5 rating scale.
     """
 
     # Verify that likelihood uses a whole-number rating.
@@ -36,32 +38,24 @@ def calculate_risk_score(likelihood, impact):
     # treats bool as a subclass of int. Without this check,
     # True could incorrectly be accepted as the numeric value 1.
     if isinstance(likelihood, bool) or not isinstance(likelihood, int):
-        raise ValueError(
-            'Likelihood must be an integer between 1 and 5.'
-        )
+        raise TypeError("Likelihood must be an integer between 1 and 5.")
 
     # Apply the same type validation to the impact rating.
     #
     # This prevents values such as 2.5, '4', True, or None
     # from being treated as valid risk ratings.
     if isinstance(impact, bool) or not isinstance(impact, int):
-        raise ValueError(
-            'Impact must be an integer between 1 and 5.'
-        )
+        raise TypeError("Impact must be an integer between 1 and 5.")
 
     # Validate that likelihood is within the permitted
     # 1-to-5 risk-rating scale.
     if likelihood < 1 or likelihood > 5:
-        raise ValueError(
-            'Likelihood must be between 1 and 5.'
-        )
+        raise ValueError("Likelihood must be between 1 and 5.")
 
     # Validate that impact is within the permitted
     # 1-to-5 risk-rating scale.
     if impact < 1 or impact > 5:
-        raise ValueError(
-            'Impact must be between 1 and 5.'
-        )
+        raise ValueError("Impact must be between 1 and 5.")
 
     # Calculate risk only after both ratings have
     # passed type and range validation.
@@ -100,10 +94,10 @@ def classify_risk(risk_score):
     # Classify the risk score according to the
     # Control Assurance Engine's risk matrix.
     if risk_score <= 4:
-        return 'LOW'
+        return "LOW"
     elif risk_score <= 9:
-        return 'MODERATE'
+        return "MODERATE"
     elif risk_score <= 16:
-        return 'HIGH'
+        return "HIGH"
     else:
-        return 'CRITICAL'
+        return "CRITICAL"
