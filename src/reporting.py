@@ -1,38 +1,41 @@
+"""
+Build structured control findings and generate assessment reports.
+
+Summarize control-assessment results, calculate finding risk,
+and prepare reporting outputs.
+"""
+
 from html import escape
 
 import pandas as pd
 
-# Import the centralized risk-scoring functions so that
-# reporting does not ducplicate risk-calculation logic.
+# Reuse centralized risk scoring to maintain consistent assessments.
 from src.risk import calculate_risk_score, classify_risk
 
+# Structured finding builder
 
-
-# ============================================================
-# STRUCTURED CONTROL FINDING BUILDER
-# ============================================================
 
 def build_control_finding(
-        control_id,
-        requirement,
-        assessable_population,
-        exceptions,
-        evidence_issues,
-        finding_description=None,
-        recommendation=None,
-        nist_csf_function = None,
-        nist_csf_category = None,
-        nist_csf_category_name = None,
-        nist_csf_subcategory = None,
-        nist_csf_subcategory_outcome = None,
-        likelihood = None,
-        impact = None,
-        identifier_column = 'username'
+    control_id,
+    requirement,
+    assessable_population,
+    exceptions,
+    evidence_issues,
+    finding_description=None,
+    recommendation=None,
+    nist_csf_function=None,
+    nist_csf_category=None,
+    nist_csf_category_name=None,
+    nist_csf_subcategory=None,
+    nist_csf_subcategory_outcome=None,
+    likelihood=None,
+    impact=None,
+    identifier_column="username",
 ):
     """
     Build a structured GRC finding from control-assessment results.
 
-    Parameters:
+    Args:
         control_id:
             Unique identifier for the control being assessed.
 
@@ -49,66 +52,66 @@ def build_control_finding(
             Records that could not be fully assessed because required
             evidence was missing or incomplete.
 
+        finding_description:
+            Optional description of the confirmed control deficiency.
+
+        recommendation:
+            Optional remediation recommendation.
+
+        nist_csf_function:
+            Optional NIST CSF function mapping.
+
+        nist_csf_category:
+            Optional NIST CSF category identifier.
+
+        nist_csf_category_name:
+            Optional NIST CSF category name.
+
+        nist_csf_subcategory:
+            Optional NIST CSF subcategory identifier.
+
+        nist_csf_subcategory_outcome:
+            Optional outcome associated with the NIST CSF subcategory.
+
+        likelihood:
+            Optional baseline likelihood rating used to score failed controls.
+
+        impact:
+            Optional baseline impact rating used to score failed controls.
+
+        identifier_column:
+            Column containing identifiers for affected entities.
+
     Returns:
-        A dictionary containing the summarized control finding.
+        dict:
+            Structured control finding containing assessment results,
+            exceptions, evidence issues, and risk information.
     """
 
-    # Count the number of records that could actually be assessed.
     population_tested = len(assessable_population)
-
-    # Count confirmed control exceptions.
     exception_count = len(exceptions)
 
-    # Calculate the percentage of the assessable population that
-    # resulted in confirmed control exceptions.
-    #
-    # We guard against a population of zero so that we do not attempt
-    # to divide by zero.
-    if population_tested >0:
-        exception_rate = round(
-            (exception_count / population_tested) * 100,
-            1
-        )
+    # Calculate the exception rate, avoiding division by zero.
+    if population_tested > 0:
+        exception_rate = round((exception_count / population_tested) * 100, 1)
     else:
         exception_rate = 0.0
 
-    # Determine the overall control-assessment result.
-    #
-    # If no records were assessable, the available evidence does not
-    # support either a PASS or FAIL conclusion.
-    #
-    # If assessable records exist and at least one confirmed exception
-    # is identified, the control fails.
-    #
-    # Otherwise, the assessed population passed the control test.
+    # An empty assessable population cannot support a PASS or FAIL conclusion.
     if population_tested == 0:
-       result = 'NOT ASSESSED'
+        result = "NOT ASSESSED"
     elif exception_count > 0:
-       result = 'FAIL'
+        result = "FAIL"
     else:
-        result = 'PASS'
+        result = "PASS"
 
-    # Extract the identifiers for entities with confirmed exceptions.
-    #
-    # The identifier is configurable because different control families
-    # operate on different types of evidence. IAM controls use usernames,
-    # while endpoint controls use device IDs.
+    # Use the appropriate entity identifier for each control family.
     affected_entities = exceptions[identifier_column].tolist()
 
-    # Calculate an active finding risk only when the control
-    # failed and both baseline risk ratings are available.
-    #
-    # A passing control may still have significant underlaying
-    # risk, but it does not represent an active control finding.
-    if (
-        result == 'FAIL'
-        and likelihood is not None
-        and impact is not None
-    ):
-        risk_score = calculate_risk_score(
-            likelihood=likelihood,
-            impact=impact
-        )
+    # Score active findings only when both risk ratings are available.
+    # Passing controls may retain underlying risk without an active finding.
+    if result == "FAIL" and likelihood is not None and impact is not None:
+        risk_score = calculate_risk_score(likelihood=likelihood, impact=impact)
 
         severity = classify_risk(risk_score)
 
@@ -116,51 +119,35 @@ def build_control_finding(
         risk_score = None
         severity = None
 
-    # Build one structured finding that can later be displayed,
-    # exported, or incorporated into a larger assessment report.
     finding = {
-        'control_id': control_id,
-        'requirement': requirement,
-
-        # Management-readable explanation of the condition
-        # identified during control assessment.
-        'finding_description': finding_description,
-
-        # Recommended management action for addressing the
-        # condition identified by the control assessment.
-        'recommendation': recommendation,
-
-        # Preserve the control's NIST CSF 2.0 mapping
-        # in the structured finding.
-        'nist_csf_function': nist_csf_function,
-        'nist_csf_category': nist_csf_category,
-        'nist_csf_category_name': nist_csf_category_name,
-        'nist_csf_subcategory': nist_csf_subcategory,
-        'nist_csf_subcategory_outcome': nist_csf_subcategory_outcome,
-
-        # Store the assessment results.
-        'result': result,
-        'population_tested': population_tested,
-        'exception_count': exception_count,
-        'exception_rate': exception_rate,
-        'affected_entities': affected_entities,
-        'evidence_issue_count': len(evidence_issues),
-
-        # Preserve the control's baseline risk ratings and
-        # calculated risk information in the finding.
-        'likelihood': likelihood,
-        'impact': impact,
-        'risk_score': risk_score,
-        'severity': severity
+        "control_id": control_id,
+        "requirement": requirement,
+        "finding_description": finding_description,
+        "recommendation": recommendation,
+        # Retain NIST CSF 2.0 mappings for traceability.
+        "nist_csf_function": nist_csf_function,
+        "nist_csf_category": nist_csf_category,
+        "nist_csf_category_name": nist_csf_category_name,
+        "nist_csf_subcategory": nist_csf_subcategory,
+        "nist_csf_subcategory_outcome": nist_csf_subcategory_outcome,
+        "result": result,
+        "population_tested": population_tested,
+        "exception_count": exception_count,
+        "exception_rate": exception_rate,
+        "affected_entities": affected_entities,
+        "evidence_issue_count": len(evidence_issues),
+        # Retain baseline risk ratings alongside calculated risk results.
+        "likelihood": likelihood,
+        "impact": impact,
+        "risk_score": risk_score,
+        "severity": severity,
     }
 
     return finding
 
 
+# Human-readable finding formatter
 
-# ============================================================
-# HUMAN-READABLE CONTROL FINDING FORMATTER
-# ============================================================
 
 def format_control_finding(finding, entity_label):
     """
@@ -180,22 +167,13 @@ def format_control_finding(finding, entity_label):
             Formatted multi-line control finding.
     """
 
-    # Convert the affected-entity list into readable text.
-    #
-    # Multiple affected entities are separated by commas.
-    # If there are no affected entities, display 'None' rather
-    # than leaving the report field blank.
-    affected_entities = finding['affected_entities']
+    affected_entities = finding["affected_entities"]
 
     if affected_entities:
-        affected_text = ', '.join(affected_entities)
+        affected_text = ", ".join(affected_entities)
     else:
-        affected_text = 'None'
+        affected_text = "None"
 
-    # Build each report field as a separate line.
-    #
-    # Keeping formatting here rather than in main.py gives every
-    # control a consistent presentation format.
     lines = [
         f"Control ID: {finding['control_id']}",
         f"Requirement: {finding['requirement']}",
@@ -207,49 +185,25 @@ def format_control_finding(finding, entity_label):
         f"Evidence Issues: {finding['evidence_issue_count']}",
     ]
 
-    # Include management-readable context when it is available.
-    #
-    # Using .get() keeps these fields optional so older or simpler
-    # findings can still be formatted without raising an error.
-    if finding.get('finding_description'):
-        lines.append(
-            f"Finding: {finding['finding_description']}"
-        )
+    if finding.get("finding_description"):
+        lines.append(f"Finding: {finding['finding_description']}")
 
-    if finding.get('recommendation'):
-        lines.append(
-            f"Recommendation: {finding['recommendation']}"
-        )
+    if finding.get("recommendation"):
+        lines.append(f"Recommendation: {finding['recommendation']}")
 
-    # Include active finding risk information only when a risk
-    # score was calculated.
-    #
-    # Failed controls can receive an active finding risk score
-    # and severity classification. PASS and NOT ASSESSED controls
-    # do not represent active risk findings, so their risk fields
-    # are intentionally omitted from the human-readable output.
-    #
-    # Use get() because risk information is optional in a
-    # structured finding. Findings without risk data should
-    # still be formatted normally.
-    if finding.get('risk_score') is not None:
+    # Include risk details only for findings with calculated scores.
+    # Findings without risk data remain valid for reporting.
+    if finding.get("risk_score") is not None:
         lines.append(f"Likelihood: {finding['likelihood']}")
         lines.append(f"Impact: {finding['impact']}")
         lines.append(f"Risk Score: {finding['risk_score']}")
         lines.append(f"Severity: {finding['severity']}")
 
-    # Join the individual fields into one multi-line string.
-    #
-    # The function returns the text rather than printing it
-    # directly. This keeps reporting logic reusable for future
-    # console output, text files, or other report formats.
-    return '\n'.join(lines)
+    return "\n".join(lines)
 
 
+# Executive summary
 
-# ============================================================
-# EXECUTIVE SUMMARY
-# ============================================================
 
 def build_executive_summary(findings):
     """
@@ -266,60 +220,34 @@ def build_executive_summary(findings):
             evidence issues, and finding severity.
     """
 
-    # Count the total number of controls included in the assessment.
     controls_assessed = len(findings)
 
-    # Count controls by assessment result.
-    passed = sum(
-        1 for finding in findings
-        if finding['result'] == 'PASS'
-    )
+    passed = sum(1 for finding in findings if finding["result"] == "PASS")
 
-    failed = sum(
-        1 for finding in findings
-        if finding['result'] == 'FAIL'
-    )
+    failed = sum(1 for finding in findings if finding["result"] == "FAIL")
 
-    not_assessed = sum(
-        1 for finding in findings
-        if finding['result'] == 'NOT ASSESSED'
-    )
+    not_assessed = sum(1 for finding in findings if finding["result"] == "NOT ASSESSED")
 
-    # Aggregate confirmed control exceptions across all findings.
-    total_exceptions = sum(
-        finding['exception_count']
-        for finding in findings
-    )
+    total_exceptions = sum(finding["exception_count"] for finding in findings)
 
-    # Aggregate evidence-quality issues separately from confirmed
-    # control exceptions.
-    evidence_issues = sum(
-        finding['evidence_issue_count']
-        for finding in findings
-    )
+    # Track evidence-quality issues separately from confirmed exceptions.
+    evidence_issues = sum(finding["evidence_issue_count"] for finding in findings)
 
-    # Count active findings by executive-level risk severity.
-    high_findings = sum(
-        1 for finding in findings
-        if finding.get('severity') == 'HIGH'
-    )
+    high_findings = sum(1 for finding in findings if finding.get("severity") == "HIGH")
 
     critical_findings = sum(
-        1 for finding in findings
-        if finding.get('severity') == 'CRITICAL'
+        1 for finding in findings if finding.get("severity") == "CRITICAL"
     )
 
-    # Return a structured summary that can later be formatted
-    # for management reporting or exported to another format.
     return {
-        'controls_assessed': controls_assessed,
-        'passed': passed,
-        'failed': failed,
-        'not_assessed': not_assessed,
-        'total_exceptions': total_exceptions,
-        'evidence_issues': evidence_issues,
-        'high_findings': high_findings,
-        'critical_findings': critical_findings
+        "controls_assessed": controls_assessed,
+        "passed": passed,
+        "failed": failed,
+        "not_assessed": not_assessed,
+        "total_exceptions": total_exceptions,
+        "evidence_issues": evidence_issues,
+        "high_findings": high_findings,
+        "critical_findings": critical_findings,
     }
 
 
@@ -337,11 +265,9 @@ def format_executive_summary(summary):
             Executive summary formatted as a Markdown table.
     """
 
-    # Build a two-column Markdown table so the assessment metrics
-    # are easy to scan in management-facing reports.
     lines = [
-        '| Metric | Result |',
-        '| --- | ---: |',
+        "| Metric | Result |",
+        "| --- | ---: |",
         f"| Controls Evaluated | {summary['controls_assessed']} |",
         f"| Passed | {summary['passed']} |",
         f"| Failed | {summary['failed']} |",
@@ -349,12 +275,10 @@ def format_executive_summary(summary):
         f"| Total Exceptions | {summary['total_exceptions']} |",
         f"| Evidence Issues | {summary['evidence_issues']} |",
         f"| High Findings | {summary['high_findings']} |",
-        f"| Critical Findings | {summary['critical_findings']} |"
+        f"| Critical Findings | {summary['critical_findings']} |",
     ]
 
-    # Join each table row with a newline to produce valid
-    # Markdown table syntax.
-    return '\n'.join(lines)
+    return "\n".join(lines)
 
 
 def format_executive_assessment(summary):
@@ -371,53 +295,38 @@ def format_executive_assessment(summary):
             Executive-level narrative assessment of the results.
     """
 
-    # Convert the small numeric values used in the assessment
-    # into words for more natural management-facing prose.
     number_words = {
-        0: 'zero',
-        1: 'one',
-        2: 'two',
-        3: 'three',
-        4: 'four',
-        5: 'five',
-        6: 'six',
-        7: 'seven',
-        8: 'eight',
-        9: 'nine',
-        10: 'ten'
+        0: "zero",
+        1: "one",
+        2: "two",
+        3: "three",
+        4: "four",
+        5: "five",
+        6: "six",
+        7: "seven",
+        8: "eight",
+        9: "nine",
+        10: "ten",
     }
 
-    controls_assessed = summary['controls_assessed']
-    failed = summary['failed']
-    high_findings = summary['high_findings']
-    critical_findings = summary['critical_findings']
+    controls_assessed = summary["controls_assessed"]
+    failed = summary["failed"]
+    high_findings = summary["high_findings"]
+    critical_findings = summary["critical_findings"]
 
-    # Use words when the value is available in the small
-    # management-reporting range; otherwise fall back to the
-    # numeric value.
-    controls_text = number_words.get(
-        controls_assessed,
-        str(controls_assessed)
-    )
+    # Spell out numbers up to ten; use digits for larger values.
+    controls_text = number_words.get(controls_assessed, str(controls_assessed))
 
-    failed_text = number_words.get(
-        failed,
-        str(failed)
-    )
+    failed_text = number_words.get(failed, str(failed))
 
-    high_text = number_words.get(
-        high_findings,
-        str(high_findings)
-    )
+    high_text = number_words.get(high_findings, str(high_findings))
 
-    # Capitalize the first number because it begins the
-    # executive assessment statement.
     failed_text = failed_text.capitalize()
 
     assessment_parts = [
         (
-            f'{failed_text} of {controls_text} controls evaluated '
-            'resulted in confirmed exceptions requiring remediation.'
+            f"{failed_text} of {controls_text} controls evaluated "
+            "resulted in confirmed exceptions requiring remediation."
         )
     ]
 
@@ -425,33 +334,27 @@ def format_executive_assessment(summary):
     # the absence of Critical findings means the assessment is
     # free of significant risk.
     if critical_findings == 0:
-        assessment_parts.append(
-            'No critical-severity findings were identified.'
-        )
+        assessment_parts.append("No critical-severity findings were identified.")
     else:
-        critical_text = number_words.get(
-            critical_findings,
-            str(critical_findings)
-        )
+        critical_text = number_words.get(critical_findings, str(critical_findings))
 
         assessment_parts.append(
-            f'{critical_text.capitalize()} findings were rated Critical.'
+            f"{critical_text.capitalize()} findings were rated Critical."
         )
 
     # Summarize High findings separately because they remain
     # significant even when no Critical findings are present.
     if high_findings > 0:
         assessment_parts.append(
-            f'{high_text.capitalize()} findings were rated High '
-            'based on the defined Northstar BuildCo risk criteria.'
+            f"{high_text.capitalize()} findings were rated High "
+            "based on the defined Northstar BuildCo risk criteria."
         )
 
-    return ' '.join(assessment_parts)
+    return " ".join(assessment_parts)
 
 
-# ------------------------------------------------------------
-# MANAGEMENT FINDINGS
-# ------------------------------------------------------------
+# Management findings
+
 
 def build_management_findings(findings):
     """
@@ -467,19 +370,13 @@ def build_management_findings(findings):
             Structured findings for controls with a FAIL result.
     """
 
-    # Include only confirmed control failures.
-    #
     # PASS controls do not require remediation, while
     # NOT ASSESSED controls represent assessment limitations
     # rather than confirmed control deficiencies.
     management_findings = [
-        finding
-        for finding in findings
-        if finding['result'] == 'FAIL'
+        finding for finding in findings if finding["result"] == "FAIL"
     ]
 
-    # Preserve each original structured finding so later
-    # reporting functions can use its complete metadata.
     return management_findings
 
 
@@ -501,47 +398,37 @@ def format_management_findings(management_findings):
     formatted_findings = []
 
     for finding in management_findings:
-        # Convert the affected entity list into readable text.
-        # If no affected entities are present, explicitly show
-        # that none were identified.
-        affected_entities = finding.get('affected_entities', [])
+        affected_entities = finding.get("affected_entities", [])
 
         if affected_entities:
-            affected_text = ', '.join(affected_entities)
+            affected_text = ", ".join(affected_entities)
         else:
-            affected_text = 'None'
+            affected_text = "None"
 
-        # Render each failed control as its own Markdown subsection.
-        # Bold labels make the finding, affected population, and
-        # remediation recommendation easier for management to scan.
         lines = [
             f"### {finding['control_id']} | {finding['severity']}",
-            '',
+            "",
             f"**Finding:** {finding['finding_description']}",
-            '',
+            "",
             f"**Affected:** {affected_text}",
-            '',
-            f"**Recommendation:** {finding['recommendation']}"
+            "",
+            f"**Recommendation:** {finding['recommendation']}",
         ]
 
-        # Store the completed findings block.
-        formatted_findings.append('\n'.join(lines))
+        formatted_findings.append("\n".join(lines))
 
-    # Separate individual control findings with blank lines.
-    return '\n\n'.join(formatted_findings)
+    return "\n\n".join(formatted_findings)
 
 
+# Management report
 
-# ------------------------------------------------------------
-# MANAGEMENT REPORT
-# ------------------------------------------------------------
 
 def generate_management_report(
     executive_summary,
     management_findings,
     assessment_date=None,
     assessment_scope=None,
-    framework_alignment=None
+    framework_alignment=None,
 ):
     """
     Generate a Markdown management report from executive-level
@@ -555,74 +442,59 @@ def generate_management_report(
             List of structured findings for controls with
             confirmed FAIL results.
 
+        assessment_date:
+            Optional date of the assessment.
+
+        assessment_scope:
+            Optional description of the assessment scope.
+
+        framework_alignment:
+            Optional description of the framework alignment.
+
     Returns:
         str:
             Complete management report formatted as Markdown.
     """
 
-    # Reuse the existing formatters so executive metrics and
-    # remediation findings remain consistent across console
-    # output and the generated management report.
-    executive_text = format_executive_summary(
-        executive_summary
-    )
+    executive_text = format_executive_summary(executive_summary)
 
-    # Convert the executive metrics into a concise narrative
-    # interpretation for management.
-    executive_assessment = format_executive_assessment(
-        executive_summary
-    )
+    executive_assessment = format_executive_assessment(executive_summary)
 
-    management_text = format_management_findings(
-        management_findings
-    )
+    management_text = format_management_findings(management_findings)
 
-    # Build optional assessment context for the management report.
-    # Each field is included only when a value is provided so the
-    # report generator remains compatible with simpler use cases.
+    # Omit unavailable context so callers can provide only relevant details.
     context_lines = []
 
     if assessment_date:
-        context_lines.append(
-            f'**Assessment Date:** {assessment_date}'
-        )
+        context_lines.append(f"**Assessment Date:** {assessment_date}")
 
     if assessment_scope:
-        context_lines.append(
-            f'**Assessment Scope:** {assessment_scope}'
-        )
+        context_lines.append(f"**Assessment Scope:** {assessment_scope}")
 
     if framework_alignment:
-        context_lines.append(
-            f'**Framework Alignment:** {framework_alignment}'
-        )
+        context_lines.append(f"**Framework Alignment:** {framework_alignment}")
 
-    # Separate each context item with a Markdown line break.
-    assessment_context = '  \n'.join(context_lines)
+    assessment_context = "  \n".join(context_lines)
 
-    # Assemble the management-facing sections into a single
-    # Markdown document.
     report_sections = [
-        '# Northstar BuildCo',
-        '## Cybersecurity Control Assurance Assessment'
+        "# Northstar BuildCo",
+        "## Cybersecurity Control Assurance Assessment",
     ]
 
-    # Include assessment context when one or more context
-    # fields were supplied.
     if assessment_context:
         report_sections.append(assessment_context)
 
-    report_sections.extend([
-        '## Executive Summary',
-        executive_text,
-        executive_assessment,
-        '## Findings Requiring Remediation',
-        management_text
-    ])
+    report_sections.extend(
+        [
+            "## Executive Summary",
+            executive_text,
+            executive_assessment,
+            "## Findings Requiring Remediation",
+            management_text,
+        ]
+    )
 
-    # Separate report sections with blank lines to produce
-    # readable Markdown output.
-    return '\n\n'.join(report_sections)
+    return "\n\n".join(report_sections)
 
 
 def export_management_report(report, filepath):
@@ -634,27 +506,30 @@ def export_management_report(report, filepath):
 
     Trailing whitespace is removed from each line while preserving
     whether the original report ends with a newline.
+
+    Args:
+        report:
+            Text content of the report.
+
+        filepath:
+            Path where the report should be written.
+
+    Returns:
+        None:
+            This function writes the report to the specified file.
     """
-    cleaned_report = '\n'.join(
-        line.rstrip()
-        for line in report.splitlines()
-    )
+    cleaned_report = "\n".join(line.rstrip() for line in report.splitlines())
 
     # Preserve the original report's final-newline behavior rather
     # than adding a newline that was not present in the source.
-    if report.endswith('\n'):
-        cleaned_report += '\n'
+    if report.endswith("\n"):
+        cleaned_report += "\n"
 
-    filepath.write_text(
-        cleaned_report,
-        encoding='utf-8'
-    )
+    filepath.write_text(cleaned_report, encoding="utf-8")
 
 
+# Findings DataFrame builder
 
-# ============================================================
-# FINDINGS DATAFRAME BUILDER
-# ============================================================
 
 def build_findings_dataframe(findings):
     """
@@ -671,34 +546,18 @@ def build_findings_dataframe(findings):
             Tabular representation of the control findings.
     """
 
-    # Convert each structured finding dictionary into a row
-    # in a pandas DataFrame.
     findings_dataframe = pd.DataFrame(findings)
 
-    # Convert each structured finding dictionary into a row
-    # in a pandas DataFrame.
-    findings_dataframe = pd.DataFrame(findings)
-
-    # Convert affected-entity lists into clean, report-ready text.
-    #
-    # Multiple entities are separated by commas, while an empty
-    # list becomes an empty string. This prevents Python list
-    # notation such as "['user1', 'user2']" from appearing in
-    # exported reports.
-    findings_dataframe['affected_entities'] = (
-        findings_dataframe['affected_entities'].apply(
-            lambda entities: ', '.join(entities)
-        )
-    )
-
+    # Join entities for report output; an empty list becomes an empty string.
+    findings_dataframe["affected_entities"] = findings_dataframe[
+        "affected_entities"
+    ].apply(lambda entities: ", ".join(entities))
 
     return findings_dataframe
 
 
+# Findings CSV exporter
 
-# ============================================================
-# FINDINGS CSV EXPORTER
-# ============================================================
 
 def export_findings_csv(findings_dataframe, output_file):
     """
@@ -710,23 +569,18 @@ def export_findings_csv(findings_dataframe, output_file):
 
         output_file:
             Path where the CSV file should be written.
+
+    Returns:
+        None:
+            This function writes the DataFrame to the specified file.
     """
 
-    # Export the findings without the pandas DataFrame index.
-    #
-    # The index is an internal pandas row identifier and is not
-    # part of the control-assessment data, so it should not appear
-    # as an extra column in the exported CSV file.
-    findings_dataframe.to_csv(
-        output_file,
-        index=False
-    )
+    # The DataFrame index is not part of the control-assessment data.
+    findings_dataframe.to_csv(output_file, index=False)
 
 
+# HTML report generator
 
-# ============================================================
-# HTML MANAGEMENT REPORT GENERATOR
-# ============================================================
 
 def escape_html(value):
     """
@@ -749,7 +603,6 @@ def escape_html(value):
     return escape(str(value), quote=True)
 
 
-
 def render_html_icon(name, size=18):
     """
     Return a self-contained SVG icon for the HTML report.
@@ -757,43 +610,46 @@ def render_html_icon(name, size=18):
     Icons use currentColor so their appearance can be
     controlled through CSS. Unknown names are rejected
     rather than inserted into HTML.
+
+    Args:
+        name:
+            Name of a supported report icon.
+
+        size:
+            Icon width and height in pixels, from 12 to 48.
+
+    Returns:
+        str:
+            SVG markup for the requested icon.
     """
     paths = {
-        'shield-check': (
+        "shield-check": (
             '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>'
             '<path d="m9 12 2 2 4-4"/>'
         ),
-        'dashboard': (
+        "dashboard": (
             '<rect x="3" y="3" width="7" height="9" rx="1"/>'
             '<rect x="14" y="3" width="7" height="5" rx="1"/>'
             '<rect x="14" y="12" width="7" height="9" rx="1"/>'
             '<rect x="3" y="16" width="7" height="5" rx="1"/>'
         ),
-        'chart': (
+        "chart": (
             '<path d="M3 3v18h18"/>'
             '<path d="M7 16v-4"/>'
             '<path d="M12 16V8"/>'
             '<path d="M17 16V5"/>'
         ),
-        'clipboard-check': (
+        "clipboard-check": (
             '<rect x="5" y="4" width="14" height="18" rx="2"/>'
             '<path d="M9 4.5h6"/>'
             '<path d="m9 14 2 2 4-4"/>'
         ),
-        'alert': (
-            '<path d="m12 3 10 18H2L12 3z"/>'
-            '<path d="M12 9v5"/>'
-            '<path d="M12 18h.01"/>'
+        "alert": (
+            '<path d="m12 3 10 18H2L12 3z"/><path d="M12 9v5"/><path d="M12 18h.01"/>'
         ),
-        'check': (
-            '<circle cx="12" cy="12" r="9"/>'
-            '<path d="m8 12 3 3 5-6"/>'
-        ),
-        'x-circle': (
-            '<circle cx="12" cy="12" r="9"/>'
-            '<path d="m9 9 6 6m0-6-6 6"/>'
-        ),
-        'file-warning': (
+        "check": ('<circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/>'),
+        "x-circle": ('<circle cx="12" cy="12" r="9"/><path d="m9 9 6 6m0-6-6 6"/>'),
+        "file-warning": (
             '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>'
             '<path d="M14 2v6h6"/>'
             '<path d="M12 12v4"/>'
@@ -802,10 +658,10 @@ def render_html_icon(name, size=18):
     }
 
     if name not in paths:
-        raise ValueError(f'Unsupported report icon: {name}')
+        raise ValueError(f"Unsupported report icon: {name}")
 
     if not isinstance(size, int) or not 12 <= size <= 48:
-        raise ValueError('Icon size must be an integer between 12 and 48')
+        raise ValueError("Icon size must be an integer between 12 and 48")
 
     return (
         f'<svg class="report-icon" width="{size}" height="{size}" '
@@ -813,8 +669,8 @@ def render_html_icon(name, size=18):
         f'stroke="currentColor" stroke-width="1.8" '
         f'stroke-linecap="round" stroke-linejoin="round" '
         f'aria-hidden="true" focusable="false">'
-        f'{paths[name]}'
-        '</svg>'
+        f"{paths[name]}"
+        "</svg>"
     )
 
 
@@ -845,7 +701,7 @@ def format_html_control_results(findings):
         risk_score = finding.get("risk_score")
 
         # Restrict CSS classes to known assessment values.
-        # Unexpected values use a neutral class rather than
+        # Unexpected values use a fallback class rather than
         # being inserted directly into HTML attributes.
         result_classes = {
             "PASS": "pass",
@@ -860,16 +716,12 @@ def format_html_control_results(findings):
         # Map each control outcome to an appropriate SVG icon.
         # Unknown outcomes receive a neutral icon.
         result_icons = {
-            'PASS': 'check',
-            'FAIL': 'x-circle',
-            'NOT ASSESSED': 'dashboard',
+            "PASS": "check",
+            "FAIL": "x-circle",
+            "NOT ASSESSED": "dashboard",
         }
 
-        # Select and render the icon for this control.
-        result_icon_name = result_icons.get(
-            str(finding['result']).upper(),
-            'dashboard'
-        )
+        result_icon_name = result_icons.get(str(finding["result"]).upper(), "dashboard")
 
         result_icon = render_html_icon(result_icon_name, 15)
 
@@ -880,18 +732,14 @@ def format_html_control_results(findings):
         # Select an SVG icon for active finding severities.
         # Controls without an assigned severity receive no icon.
         severity_icons = {
-            'HIGH': 'alert',
-            'CRITICAL': 'alert',
+            "HIGH": "alert",
+            "CRITICAL": "alert",
         }
 
-        severity_icon_name = severity_icons.get(
-            str(finding.get('severity')).upper()
-        )
+        severity_icon_name = severity_icons.get(str(finding.get("severity")).upper())
 
         severity_icon = (
-            render_html_icon(severity_icon_name, 14)
-            if severity_icon_name
-            else ''
+            render_html_icon(severity_icon_name, 14) if severity_icon_name else ""
         )
 
         if risk_score is None:
@@ -899,17 +747,15 @@ def format_html_control_results(findings):
         else:
             risk_score_text = str(risk_score)
 
-        # Build one HTML card using values already calculated by
-        # the control-assessment and risk-evaluation layers.
         card = f"""
             <article class="control-card control-{result_class}">
                 <div class="control-card-header">
-                    <h3>{escape_html(finding['control_id'])}</h3>
+                    <h3>{escape_html(finding["control_id"])}</h3>
 
                     <div class="control-status">
                         <span class="result-badge result-{result_class}">
                             {result_icon}
-                            {escape_html(finding['result'])}
+                            {escape_html(finding["result"])}
                         </span>
 
                         <span class="severity-badge severity-{severity_class}">
@@ -920,33 +766,33 @@ def format_html_control_results(findings):
                 </div>
 
                 <p class="control-requirement">
-                    {escape_html(finding['requirement'])}
+                    {escape_html(finding["requirement"])}
                 </p>
 
                 <dl class="control-metrics">
                     <div>
                         <dt>NIST CSF</dt>
-                        <dd>{escape_html(finding['nist_csf_subcategory'])}</dd>
+                        <dd>{escape_html(finding["nist_csf_subcategory"])}</dd>
                     </div>
 
                     <div>
                         <dt>Population Tested</dt>
-                        <dd>{escape_html(finding['population_tested'])}</dd>
+                        <dd>{escape_html(finding["population_tested"])}</dd>
                     </div>
 
                     <div>
                         <dt>Exceptions</dt>
-                        <dd>{escape_html(finding['exception_count'])}</dd>
+                        <dd>{escape_html(finding["exception_count"])}</dd>
                     </div>
 
                     <div>
                         <dt>Exception Rate</dt>
-                        <dd>{escape_html(finding['exception_rate'])}%</dd>
+                        <dd>{escape_html(finding["exception_rate"])}%</dd>
                     </div>
 
                     <div>
                         <dt>Evidence Issues</dt>
-                        <dd>{escape_html(finding['evidence_issue_count'])}</dd>
+                        <dd>{escape_html(finding["evidence_issue_count"])}</dd>
                     </div>
 
                     <div>
@@ -959,7 +805,6 @@ def format_html_control_results(findings):
 
         control_cards.append(card)
 
-    # Combine all control cards into one HTML block.
     return "\n".join(control_cards)
 
 
@@ -977,14 +822,13 @@ def format_html_management_findings(management_findings):
             by build_management_findings().
 
     Returns:
-        String containing HTML for the management findings.
+        str:
+            HTML containing the management findings.
     """
     finding_cards = []
 
     for finding in management_findings:
-        # Present affected entities as a readable comma-separated list.
-        # Escape each affected entity before combining them.
-        # This prevents entity names from introducing HTML markup.
+        # Escape each entity to prevent names from introducing HTML markup.
         affected_entities = ", ".join(
             escape_html(entity) for entity in finding["affected_entities"]
         )
@@ -992,31 +836,26 @@ def format_html_management_findings(management_findings):
         # Restrict severity CSS classes to known values.
         severity_classes = {"HIGH": "high", "CRITICAL": "critical"}
 
-        # Use the finding's severity for the management report.
-        severity = finding['severity']
+        severity = finding["severity"]
 
         severity_class = severity_classes.get(str(finding["severity"]).upper(), "none")
 
         # Display severity icons only for active risk findings.
         severity_icons = {
-            'HIGH': 'alert',
-            'CRITICAL': 'alert',
+            "HIGH": "alert",
+            "CRITICAL": "alert",
         }
 
-        severity_icon_name = severity_icons.get(
-            str(finding.get('severity')).upper()
-        )
+        severity_icon_name = severity_icons.get(str(finding.get("severity")).upper())
 
         severity_icon = (
-            render_html_icon(severity_icon_name, 14)
-            if severity_icon_name
-            else ''
+            render_html_icon(severity_icon_name, 14) if severity_icon_name else ""
         )
 
         card = f"""
             <article class="finding-card">
                 <div class="finding-card-header">
-                    <h3>{escape_html(finding['control_id'])}</h3>
+                    <h3>{escape_html(finding["control_id"])}</h3>
 
                     <span class="severity-badge severity-{severity_class}">
                         {severity_icon}
@@ -1027,7 +866,7 @@ def format_html_management_findings(management_findings):
                 <div class="finding-content">
                     <div class="finding-detail">
                         <h4>Finding</h4>
-                        <p>{escape_html(finding['finding_description'])}</p>
+                        <p>{escape_html(finding["finding_description"])}</p>
                     </div>
 
                     <div class="finding-detail">
@@ -1037,7 +876,7 @@ def format_html_management_findings(management_findings):
 
                     <div class="finding-detail">
                         <h4>Recommendation</h4>
-                        <p>{escape_html(finding['recommendation'])}</p>
+                        <p>{escape_html(finding["recommendation"])}</p>
                     </div>
                 </div>
             </article>
@@ -1061,9 +900,10 @@ def format_html_control_outcomes(summary):
             build_executive_summary().
 
     Returns:
-        String containing HTML for the control-outcomes visual.
+        str:
+            HTML for the control-outcomes visual.
     """
-    controls_evaluated = summary['controls_assessed']
+    controls_evaluated = summary["controls_assessed"]
 
     # Avoid division by zero when a report contains no controls.
     if controls_evaluated == 0:
@@ -1071,15 +911,9 @@ def format_html_control_outcomes(summary):
         failed_percent = 0
         not_assessed_percent = 0
     else:
-        passed_percent = (
-            summary['passed'] / controls_evaluated * 100
-        )
-        failed_percent = (
-            summary['failed'] / controls_evaluated * 100
-        )
-        not_assessed_percent = (
-            summary['not_assessed'] / controls_evaluated * 100
-        )
+        passed_percent = summary["passed"] / controls_evaluated * 100
+        failed_percent = summary["failed"] / controls_evaluated * 100
+        not_assessed_percent = summary["not_assessed"] / controls_evaluated * 100
 
     return f"""
         <div class="visual-card">
@@ -1109,13 +943,13 @@ def format_html_control_outcomes(summary):
                 <div>
                     <span class="legend-marker legend-pass"></span>
                     <span>Passed</span>
-                    <strong>{summary['passed']}</strong>
+                    <strong>{summary["passed"]}</strong>
                 </div>
 
                 <div>
                     <span class="legend-marker legend-fail"></span>
                     <span>Failed</span>
-                    <strong>{summary['failed']}</strong>
+                    <strong>{summary["failed"]}</strong>
                 </div>
 
                 <div>
@@ -1123,7 +957,7 @@ def format_html_control_outcomes(summary):
                         class="legend-marker legend-not-assessed"
                     ></span>
                     <span>Not Assessed</span>
-                    <strong>{summary['not_assessed']}</strong>
+                    <strong>{summary["not_assessed"]}</strong>
                 </div>
             </div>
         </div>
@@ -1147,13 +981,12 @@ def format_html_finding_severity(summary):
             build_executive_summary().
 
     Returns:
-        String containing HTML for the finding-severity visual.
+        str:
+            HTML for the finding-severity visual.
     """
-    high_findings = summary['high_findings']
-    critical_findings = summary['critical_findings']
+    high_findings = summary["high_findings"]
+    critical_findings = summary["critical_findings"]
 
-    # The severity population includes only findings that currently
-    # have an active High or Critical severity classification.
     severity_findings = high_findings + critical_findings
 
     # Avoid division by zero when no active severity findings exist.
@@ -1161,12 +994,8 @@ def format_html_finding_severity(summary):
         high_percent = 0
         critical_percent = 0
     else:
-        high_percent = (
-            high_findings / severity_findings * 100
-        )
-        critical_percent = (
-            critical_findings / severity_findings * 100
-        )
+        high_percent = high_findings / severity_findings * 100
+        critical_percent = critical_findings / severity_findings * 100
 
     return f"""
         <div class="visual-card">
@@ -1221,7 +1050,8 @@ def format_html_evidence_comparison(findings):
             List of structured control-assessment findings.
 
     Returns:
-        String containing HTML for the evidence comparison visual.
+        str:
+            HTML for the evidence comparison visual.
     """
     comparison_rows = []
 
@@ -1251,7 +1081,7 @@ def format_html_evidence_comparison(findings):
         row = f"""
             <div class="comparison-row">
                 <div class="comparison-control">
-                    {escape_html(finding['control_id'])}
+                    {escape_html(finding["control_id"])}
                 </div>
 
                 <div class="comparison-measure">
@@ -1291,7 +1121,7 @@ def format_html_evidence_comparison(findings):
             </div>
 
             <div class="comparison-chart">
-                {''.join(comparison_rows)}
+                {"".join(comparison_rows)}
             </div>
         </div>
     """
@@ -1312,17 +1142,23 @@ def format_html_report(
         findings:
             List of structured control finding dictionaries.
 
+        assessment_date:
+            Optional date of the assessment.
+
+        assessment_scope:
+            Optional description of the assessment scope.
+
+        framework_alignment:
+            Optional description of the framework alignment.
+
     Returns:
         str:
             A complete HTML document representing the management report.
     """
 
-    # Reuse the existing executive-summary logic so the HTML and
-    # Markdown reports are based on the same assessment metrics.
+    # Share summary and remediation selection with the Markdown report.
     summary = build_executive_summary(findings)
 
-    # Reuse the existing remediation-focused finding logic so the
-    # HTML and Markdown reports identify the same management actions.
     management_findings = build_management_findings(findings)
 
     return f"""<!DOCTYPE html>
@@ -2181,39 +2017,39 @@ def format_html_report(
 <body>
     <main>
         <header>
-            <h1>{render_html_icon('shield-check', 28)} Control Assurance Engine</h1>
+            <h1>{render_html_icon("shield-check", 28)} Control Assurance Engine</h1>
             <h2>Northstar BuildCo — Management Assessment Report</h2>
 
             <div class="assessment-context">
                 <div>
                     <span>Assessment Date</span>
-                    <strong>{escape_html(assessment_date or 'Not specified')}</strong>
+                    <strong>{escape_html(assessment_date or "Not specified")}</strong>
                 </div>
 
                 <div>
                     <span>Assessment Scope</span>
-                    <strong>{escape_html(assessment_scope or 'Not specified')}</strong>
+                    <strong>{escape_html(assessment_scope or "Not specified")}</strong>
                 </div>
 
                 <div>
                     <span>Framework Alignment</span>
-                    <strong>{escape_html(framework_alignment or 'Not specified')}</strong>
+                    <strong>{escape_html(framework_alignment or "Not specified")}</strong>
                 </div>
             </div>
         </header>
 
         <section>
-            <h2>{render_html_icon('dashboard', 21)} Executive Summary</h2>
+            <h2>{render_html_icon("dashboard", 21)} Executive Summary</h2>
 
             <div class="metrics">
 
             <!-- Overall number of controls evaluated. -->
             <div class="metric metric-neutral">
                 <span class="metric-icon">
-                    {render_html_icon('clipboard-check', 20)}
+                    {render_html_icon("clipboard-check", 20)}
                 </span>
                 <span class="metric-value">
-                    {summary['controls_assessed']}
+                    {summary["controls_assessed"]}
                 </span>
                 <span class="metric-label">Controls Evaluated</span>
             </div>
@@ -2221,10 +2057,10 @@ def format_html_report(
             <!-- Controls that satisfied their defined requirements. -->
             <div class="metric metric-passed">
                 <span class="metric-icon">
-                    {render_html_icon('check', 20)}
+                    {render_html_icon("check", 20)}
                 </span>
                 <span class="metric-value">
-                    {summary['passed']}
+                    {summary["passed"]}
                 </span>
                 <span class="metric-label">Passed</span>
             </div>
@@ -2232,10 +2068,10 @@ def format_html_report(
             <!-- Controls with confirmed exceptions. -->
             <div class="metric metric-failed">
                 <span class="metric-icon">
-                    {render_html_icon('x-circle', 20)}
+                    {render_html_icon("x-circle", 20)}
                 </span>
                 <span class="metric-value">
-                    {summary['failed']}
+                    {summary["failed"]}
                 </span>
                 <span class="metric-label">Failed</span>
             </div>
@@ -2243,10 +2079,10 @@ def format_html_report(
             <!-- Controls that could not be assessed from available evidence. -->
             <div class="metric metric-not-assessed">
                 <span class="metric-icon">
-                    {render_html_icon('dashboard', 20)}
+                    {render_html_icon("dashboard", 20)}
                 </span>
                 <span class="metric-value">
-                    {summary['not_assessed']}
+                    {summary["not_assessed"]}
                 </span>
                 <span class="metric-label">Not Assessed</span>
             </div>
@@ -2254,10 +2090,10 @@ def format_html_report(
             <!-- Confirmed exceptions across all evaluated controls. -->
             <div class="metric metric-exceptions">
                 <span class="metric-icon">
-                    {render_html_icon('alert', 20)}
+                    {render_html_icon("alert", 20)}
                 </span>
                 <span class="metric-value">
-                    {summary['total_exceptions']}
+                    {summary["total_exceptions"]}
                 </span>
                 <span class="metric-label">Total Exceptions</span>
             </div>
@@ -2265,10 +2101,10 @@ def format_html_report(
             <!-- Evidence-quality issues kept separate from control failures. -->
             <div class="metric metric-evidence">
                 <span class="metric-icon">
-                    {render_html_icon('file-warning', 20)}
+                    {render_html_icon("file-warning", 20)}
                 </span>
                 <span class="metric-value">
-                    {summary['evidence_issues']}
+                    {summary["evidence_issues"]}
                 </span>
                 <span class="metric-label">Evidence Issues</span>
             </div>
@@ -2276,10 +2112,10 @@ def format_html_report(
             <!-- Failed controls rated High severity. -->
             <div class="metric metric-high">
                 <span class="metric-icon">
-                    {render_html_icon('alert', 20)}
+                    {render_html_icon("alert", 20)}
                 </span>
                 <span class="metric-value">
-                    {summary['high_findings']}
+                    {summary["high_findings"]}
                 </span>
                 <span class="metric-label">High Findings</span>
             </div>
@@ -2287,10 +2123,10 @@ def format_html_report(
             <!-- Failed controls rated Critical severity. -->
             <div class="metric metric-critical">
                 <span class="metric-icon">
-                    {render_html_icon('shield-check', 20)}
+                    {render_html_icon("shield-check", 20)}
                 </span>
                 <span class="metric-value">
-                    {summary['critical_findings']}
+                    {summary["critical_findings"]}
                 </span>
                 <span class="metric-label">Critical Findings</span>
             </div>
@@ -2299,7 +2135,7 @@ def format_html_report(
         </section>
 
         <section>
-            <h2>{render_html_icon('chart', 21)} Visual Analysis</h2>
+            <h2>{render_html_icon("chart", 21)} Visual Analysis</h2>
 
             <div class="visual-analysis">
                 {format_html_control_outcomes(summary)}
@@ -2309,7 +2145,7 @@ def format_html_report(
         </section>
 
         <section>
-            <h2>{render_html_icon('clipboard-check', 21)} Control Results</h2>
+            <h2>{render_html_icon("clipboard-check", 21)} Control Results</h2>
 
             <div class="control-results">
                 {format_html_control_results(findings)}
@@ -2317,7 +2153,7 @@ def format_html_report(
         </section>
 
         <section>
-            <h2>{render_html_icon('alert', 21)} Findings Requiring Remediation</h2>
+            <h2>{render_html_icon("alert", 21)} Findings Requiring Remediation</h2>
 
             <div class="management-findings">
                 {format_html_management_findings(management_findings)}

@@ -1,26 +1,27 @@
-'''
-Tests for private assessment storage configurations.
-'''
+"""
+Configure private cybersecurity assessment storage.
+
+Define storage locations for assessment records, keeping
+them separate from publicly generated HTML reports.
+"""
 
 from pathlib import Path
 
-from src.assessment_config import(
-    PROJECT_ROOT,
+from src.assessment_config import (
     ASSESSMENT_DIRECTORY,
-    get_assessments_directory
+    PROJECT_ROOT,
+    get_assessments_directory,
 )
 
 
 def test_assessment_directory_is_inside_project():
-    '''
+    """
     Verify that the default assessment storage location
     resolved to the project's private data directory.
-    '''
+    """
 
     # Determine the expected directory.
-    expected_directory = (
-        PROJECT_ROOT / 'data' / 'assessments'
-    )
+    expected_directory = PROJECT_ROOT / "data" / "assessments"
 
     # Verify the configured location.
     assert ASSESSMENT_DIRECTORY == expected_directory
@@ -30,27 +31,20 @@ def test_assessment_directory_is_inside_project():
     assert isinstance(get_assessments_directory(), Path)
 
 
-def test_get_assessment_directory_has_no_side_effects(
-        tmp_path,
-        monkeypatch
-):
-    '''
+def test_get_assessment_directory_has_no_side_effects(tmp_path, monkeypatch):
+    """
     Verify that retrieveing the configured path does not
     create the directory or modify the filesystem.
-    '''
+    """
 
     # Import the module so we can replace its configured path.
     import src.assessment_config as config
 
     # Choose a directory that does not exist.
-    test_directory = tmp_path / 'private-assessments'
+    test_directory = tmp_path / "private-assessments"
 
     # Temporarily override the module's configured directory.
-    monkeypatch.setattr(
-        config,
-        'ASSESSMENT_DIRECTORY',
-        test_directory
-    )
+    monkeypatch.setattr(config, "ASSESSMENT_DIRECTORY", test_directory)
 
     # Retrieve the configured path.
     result = config.get_assessments_directory()

@@ -1,1274 +1,925 @@
+"""Tests for assessment reporting and export functionality."""
+
 import pandas as pd
 
-# Import the reporting function that we are about to build.
-#
-# The function does not exist yet, so this test shoudl initially
-# fail during the collection. That is our RED stage of TDD.
 from src.reporting import (
     build_control_finding,
-    build_findings_dataframe,
     build_executive_summary,
-    format_executive_summary,
-    format_executive_assessment,
+    build_findings_dataframe,
     build_management_findings,
+    export_findings_csv,
+    export_management_report,
+    format_control_finding,
+    format_executive_assessment,
+    format_executive_summary,
+    format_html_control_outcomes,
+    format_html_control_results,
+    format_html_evidence_comparison,
+    format_html_finding_severity,
+    format_html_management_findings,
+    format_html_report,
     format_management_findings,
     generate_management_report,
-    export_management_report,
-    export_findings_csv,
-    format_control_finding,
-    format_html_report,
-    format_html_control_results,
-    format_html_management_findings,
-    format_html_control_outcomes,
-    format_html_finding_severity,
-    format_html_evidence_comparison
 )
 
+# Structured control finding tests
 
-
-# ============================================================
-# STRUCTURED CONTROL FINDING TESTS
-# ============================================================
 
 def test_build_iam_01_finding():
-    """
-    Test that IAM-01 assessment results are converted into
-    a structured GRC finding with the correct metrics.
-    """
+    """Verify that IAM-01 findings retain the expected metrics and metadata."""
+    # Six active accounts have sufficient evidence for IAM-01 assessment.
+    assessable_users = pd.DataFrame(
+        [
+            {"username": "jcarter"},
+            {"username": "mlopez"},
+            {"username": "akim"},
+            {"username": "dthomas"},
+            {"username": "snguyen"},
+            {"username": "kpatel"},
+        ]
+    )
 
-    # Create the assessable population for IAM-01.
-    #
-    # these six accounts are active and contain sufficient evidence
-    # for us to determine whther the control is operating as required.
-    assessable_users = pd.DataFrame([
-        {'username': 'jcarter'},
-        {'username': 'mlopez'},
-        {'username': 'akim'},
-        {'username': 'dthomas'},
-        {'username': 'snguyen'},
-        {'username': 'kpatel'}
-    ])
+    exceptions = pd.DataFrame([{"username": "mlopez"}, {"username": "snguyen"}])
 
-    # Create the confirmed control exceptions.
-    #
-    # These are active accounts that do not have MFA enabled.
-    exceptions = pd.DataFrame([
-        {'username': 'mlopez'},
-        {'username': 'snguyen'}
-    ])
+    # tgreen is excluded from the assessable population because account
+    # status is unknown; track this as an evidence-quality issue.
+    evidence_issues = pd.DataFrame([{"username": "tgreen"}])
 
-    # Create the evidence-wuality issues separately.
-    #
-    # tgreen cannot be included in the asessable population because
-    # the account's enabled status is unknown.
-    evidence_issues = pd.DataFrame([
-        {'username': 'tgreen'}
-    ])
-
-    # Build the structured IAM-01 finding.
     finding = build_control_finding(
-        control_id = 'IAM-01',
-        requirement = 'All active user accounts must have MFA enabled.',
-        assessable_population = assessable_users,
-        exceptions = exceptions,
-        evidence_issues = evidence_issues,
-
-        # Include the control's NIST CSF 2.0 mapping in the finding.
-        nist_csf_function='Protect',
-        nist_csf_category='PR.AA',
-        nist_csf_subcategory='PR.AA-03',
-
-        # Include the human-readable NIST CSF 2.0 metadata
-        # along with the framework codes.
+        control_id="IAM-01",
+        requirement="All active user accounts must have MFA enabled.",
+        assessable_population=assessable_users,
+        exceptions=exceptions,
+        evidence_issues=evidence_issues,
+        nist_csf_function="Protect",
+        nist_csf_category="PR.AA",
+        nist_csf_subcategory="PR.AA-03",
         nist_csf_category_name=(
-            'Identity Management, Authentication, and Access Control'
+            "Identity Management, Authentication, and Access Control"
         ),
         nist_csf_subcategory_outcome=(
-            'Users, services, and hardware are authenticated'
+            "Users, services, and hardware are authenticated"
         ),
-
-        # OInclude the control's baseline rink ratings.
         likelihood=4,
         impact=4,
-
-        # Provide management-readable context describing the
-        # condition identified by the control assessment.
         finding_description=(
-            'Three active user accounts were identified without MFA enabled.'
+            "Three active user accounts were identified without MFA enabled."
         ),
-
-        # Provide a management action that addresses the
-        # condition identified by the control assessment.
         recommendation=(
-            'Enable MFA for all active user accounts and verify enrollment.'
+            "Enable MFA for all active user accounts and verify enrollment."
         ),
     )
 
-    # Verify the identity and requirement of the control being reported.
-    assert finding['control_id'] == 'IAM-01'
-    assert finding['requirement'] == (
-        'All active user accounts must have MFA enabled.'
+    assert finding["control_id"] == "IAM-01"
+    assert finding["requirement"] == ("All active user accounts must have MFA enabled.")
+
+    assert finding["population_tested"] == 6
+
+    assert finding["exception_count"] == 2
+
+    assert finding["exception_rate"] == 33.3
+
+    assert finding["result"] == "FAIL"
+
+    assert finding["affected_entities"] == ["mlopez", "snguyen"]
+
+    assert finding["evidence_issue_count"] == 1
+
+    assert finding["nist_csf_function"] == "Protect"
+    assert finding["nist_csf_category"] == "PR.AA"
+    assert finding["nist_csf_subcategory"] == "PR.AA-03"
+
+    assert finding["nist_csf_category_name"] == (
+        "Identity Management, Authentication, and Access Control"
     )
 
-    # Six active accounts contain sufficient evidence to be asessed.
-    assert finding['population_tested'] == 6
-
-    # Two of those six accounts failed the control.
-    assert finding['exception_count'] == 2
-
-    # 2 exceptions / 6 assessable account = 33.3%
-    assert finding['exception_rate'] == 33.3
-
-    # Because at least one confirmed exception exists,
-    # the overall control result should be FAIL.
-    assert finding['result'] == 'FAIL'
-
-    # The finding should preserve the identities of the accounts
-    # responsible for the confirmed control exception.
-    assert finding['affected_entities'] == ['mlopez', 'snguyen']
-    
-    # Evidence-quality problems should also be quantified separately.
-    assert finding['evidence_issue_count'] == 1
-
-    # Verify that the NIST CSF mapping is preserved
-    # in the structured control finding.
-    assert finding['nist_csf_function'] == 'Protect'
-    assert finding['nist_csf_category'] == 'PR.AA'
-    assert finding['nist_csf_subcategory'] == 'PR.AA-03'
-
-    # Verify that the human-readable NIST CSF metadata
-    # is preserved in the structured finding.
-    assert finding['nist_csf_category_name'] == (
-        'Identity Management, Authentication, and Access Control'
+    assert finding["nist_csf_subcategory_outcome"] == (
+        "Users, services, and hardware are authenticated"
     )
 
-    assert finding['nist_csf_subcategory_outcome'] == (
-        'Users, services, and hardware are authenticated'
+    assert finding["likelihood"] == 4
+    assert finding["impact"] == 4
+    assert finding["risk_score"] == 16
+    assert finding["severity"] == "HIGH"
+
+    assert finding["finding_description"] == (
+        "Three active user accounts were identified without MFA enabled."
     )
 
-    # Verify that the control's risk ratings and calculated
-    # risk information are preserved in the finding.
-    assert finding['likelihood'] == 4
-    assert finding['impact'] == 4
-    assert finding['risk_score'] == 16
-    assert finding['severity'] == 'HIGH'
-
-    # Verify that the management-readable finding description
-    # is preserved in the structured finding.
-    assert finding['finding_description'] == (
-        'Three active user accounts were identified without MFA enabled.'
-    )
-
-    # Verify that the recommended management action is
-    # preserved in the structured finding.
-    assert finding['recommendation'] == (
-        'Enable MFA for all active user accounts and verify enrollment.'
+    assert finding["recommendation"] == (
+        "Enable MFA for all active user accounts and verify enrollment."
     )
 
 
 def test_build_end_01_finding():
-    """
-    Test that a structured END-01 finding can use device IDs
-    rather than usernames as the affected entity identifier.
-    """
+    """Verify that END-01 findings can identify affected devices."""
+    assessable_population = pd.DataFrame(
+        [
+            {"device_id": "DEV-001"},
+            {"device_id": "DEV-002"},
+            {"device_id": "DEV-003"},
+            {"device_id": "DEV-004"},
+            {"device_id": "DEV-005"},
+            {"device_id": "DEV-006"},
+        ]
+    )
 
-    # Create a controlled assessable population of six
-    # company-managed endpoints.
-    assessable_population = pd.DataFrame([
-        {'device_id': 'DEV-001'},
-        {'device_id': 'DEV-002'},
-        {'device_id': 'DEV-003'},
-        {'device_id': 'DEV-004'},
-        {'device_id': 'DEV-005'},
-        {'device_id': 'DEV-006'}
-    ])
+    exceptions = pd.DataFrame([{"device_id": "DEV-002"}, {"device_id": "DEV-005"}])
 
-    # Two of the six assessable endpoints violate END-01.
-    exceptions = pd.DataFrame([
-        {'device_id': 'DEV-002'},
-        {'device_id': 'DEV-005'}
-    ])
+    # DEV-007 lacks evidence and is tracked separately from exceptions.
+    evidence_issues = pd.DataFrame([{"device_id": "DEV-007"}])
 
-    # One additional managed endpoint has insufficient evidence
-    # and therefore is not part of the assessable population.
-    evidence_issues = pd.DataFrame([
-        {'device_id': 'DEV-007'}
-    ])
-
-    # Build the finding using device_id as the identifier
-    # for affected entities.
     finding = build_control_finding(
-        control_id='END-01',
-        requirement='Company-managed endpoints must use disk encryption.',
+        control_id="END-01",
+        requirement="Company-managed endpoints must use disk encryption.",
         assessable_population=assessable_population,
         exceptions=exceptions,
         evidence_issues=evidence_issues,
-        identifier_column='device_id'
+        identifier_column="device_id",
     )
 
-    # Verify the calculated control metrics.
-    assert finding['population_tested'] == 6
-    assert finding['exception_count'] == 2
-    assert finding['exception_rate'] == 33.3
-    assert finding['result'] == 'FAIL'
+    assert finding["population_tested"] == 6
+    assert finding["exception_count"] == 2
+    assert finding["exception_rate"] == 33.3
+    assert finding["result"] == "FAIL"
 
-    # The reporting layer should return a neutral affected-entities
-    # field that works for users, devices, and future evidence types.
-    assert finding['affected_entities'] == [
-        'DEV-002',
-        'DEV-005'
-    ]
+    assert finding["affected_entities"] == ["DEV-002", "DEV-005"]
 
-    # DEV-007 is tracked separately as an evidence-quality issue.
-    assert finding['evidence_issue_count'] == 1
+    assert finding["evidence_issue_count"] == 1
 
 
 def test_build_control_finding_returns_not_assessed_for_zero_population():
-    """
-    Verify that a control with no assessable population is reported
-    as NOT ASSESSED rather than incorrectly reported as PASS.
-    """
+    """Verify that an empty population yields NOT ASSESSED rather than PASS."""
     assessable_population = pd.DataFrame()
-    exceptions = pd.DataFrame(columns=['username'])
-    evidence_issues = pd.DataFrame(columns=['username'])
+    exceptions = pd.DataFrame(columns=["username"])
+    evidence_issues = pd.DataFrame(columns=["username"])
 
-    # Build a finding when no records were available for assessment.
     finding = build_control_finding(
-        control_id='TEST-01',
-        requirement='Test control requirement.',
+        control_id="TEST-01",
+        requirement="Test control requirement.",
         assessable_population=assessable_population,
         exceptions=exceptions,
         evidence_issues=evidence_issues,
-
-        # Include baseline risk ratings to verify that an
-        # unassessed control does not become an active risk finding.
+        # An unassessed control must not become an active risk finding.
         likelihood=4,
-        impact=5
+        impact=5,
     )
 
-    # A zero assessable population does not provide enough evidence
-    # to conclude that the control passed.
-    assert finding['result'] == 'NOT ASSESSED'
+    assert finding["result"] == "NOT ASSESSED"
 
-    # The population and exception metrics should still be accurate.
-    assert finding['population_tested'] == 0
-    assert finding['exception_count'] == 0
-    assert finding['exception_rate'] == 0.0
-    
-    # A control that could not be assessed shoudl not receive
-    # an active finding risk score or severity classification.
-    assert finding['risk_score'] is None
-    assert finding['severity'] is None
+    assert finding["population_tested"] == 0
+    assert finding["exception_count"] == 0
+    assert finding["exception_rate"] == 0.0
+
+    assert finding["risk_score"] is None
+    assert finding["severity"] is None
 
 
+# Human-readable finding formatter tests
 
-# ============================================================
-# HUMAN-READABLE CONTROL FINDING FORMATTER TESTS
-# ============================================================
 
 def test_format_control_finding():
-    """
-    Test that a structured control finding is converted into
-    consistent, human-readable report output.
-    """
-
-    # Create a representative endpoint control finding.
+    """Verify that structured findings are formatted for human readers."""
     finding = {
-        'control_id': 'END-01',
-        'requirement': (
-            'Company-managed endpoints must use disk encryption.'
+        "control_id": "END-01",
+        "requirement": ("Company-managed endpoints must use disk encryption."),
+        "result": "FAIL",
+        "population_tested": 6,
+        "exception_count": 2,
+        "exception_rate": 33.3,
+        "affected_entities": ["DEV-002", "DEV-005"],
+        "evidence_issue_count": 1,
+        "likelihood": 4,
+        "impact": 4,
+        "risk_score": 16,
+        "severity": "HIGH",
+        "finding_description": (
+            "Company-managed endpoints were identified without disk encryption."
         ),
-        'result': 'FAIL',
-        'population_tested': 6,
-        'exception_count': 2,
-        'exception_rate': 33.3,
-        'affected_entities': ['DEV-002', 'DEV-005'],
-        'evidence_issue_count': 1,
-
-        # Include active finding risk information in the
-        # structured finding used by the formatter test.
-        'likelihood': 4,
-        'impact': 4,
-        'risk_score': 16,
-        'severity': 'HIGH',
-
-        # Include management-readable context appropriate for
-        # the END-01 endpoint encryption control.
-        'finding_description': (
-            'Company-managed endpoints were identified without disk encryption.'
+        "recommendation": (
+            "Enable full-disk encryption on all company-managed endpoints."
         ),
-        'recommendation': (
-            'Enable full-disk encryption on all company-managed endpoints.'
-        )
     }
 
-    # Format the structured finding for human-readable output.
-    output = format_control_finding(
-        finding,
-        entity_label='Devices'
-    )
+    output = format_control_finding(finding, entity_label="Devices")
 
-    # Verify that the important finding information appears
-    # in the formatted output.
-    assert 'Control ID: END-01' in output
+    assert "Control ID: END-01" in output
     assert (
-        'Requirement: Company-managed endpoints must use '
-        'disk encryption.'
+        "Requirement: Company-managed endpoints must use disk encryption."
     ) in output
-    assert 'Result: FAIL' in output
-    assert 'Population Tested: 6' in output
-    assert 'Exception Count: 2' in output
-    assert 'Exception Rate: 33.3%' in output
-    assert 'Affected Devices: DEV-002, DEV-005' in output
-    assert 'Evidence Issues: 1' in output
+    assert "Result: FAIL" in output
+    assert "Population Tested: 6" in output
+    assert "Exception Count: 2" in output
+    assert "Exception Rate: 33.3%" in output
+    assert "Affected Devices: DEV-002, DEV-005" in output
+    assert "Evidence Issues: 1" in output
 
-    # Verify that active finding risk information is included
-    # in the homan-readable control finding.
-    assert 'Likelihood: 4' in output
-    assert 'Impact: 4' in output
-    assert 'Risk Score: 16' in output
-    assert 'Severity: HIGH' in output
+    assert "Likelihood: 4" in output
+    assert "Impact: 4" in output
+    assert "Risk Score: 16" in output
+    assert "Severity: HIGH" in output
 
-    # Verify that management context is included in the
-    # human-readable control finding.
     assert (
-        'Finding: Company-managed endpoints were identified without disk encryption.'
+        "Finding: Company-managed endpoints were identified without disk encryption."
         in output
     )
 
     assert (
-        'Recommendation: Enable full-disk encryption on all '
-        'company-managed endpoints.'
-        in output
+        "Recommendation: Enable full-disk encryption on all "
+        "company-managed endpoints." in output
     )
 
 
 def test_format_control_finding_with_no_affected_entities():
-    """
-    Test that a control finding displays 'None' when there
-    are no affected entities.
-    """
-
-    # Create a passing control finding with no exceptions
-    # and therefore no affected devices.
+    """Verify that findings without affected entities display "None"."""
     finding = {
-        'control_id': 'END-02',
-        'requirement': (
-            'Company-managed endpoints must have endpoint '
-            'protection enabled.'
+        "control_id": "END-02",
+        "requirement": (
+            "Company-managed endpoints must have endpoint protection enabled."
         ),
-        'result': 'PASS',
-        'population_tested': 7,
-        'exception_count': 0,
-        'exception_rate': 0.0,
-        'affected_entities': [],
-        'evidence_issue_count': 0
+        "result": "PASS",
+        "population_tested": 7,
+        "exception_count": 0,
+        "exception_rate": 0.0,
+        "affected_entities": [],
+        "evidence_issue_count": 0,
     }
 
-    # Format the finding using the device entity label.
-    output = format_control_finding(
-        finding,
-        entity_label='Devices'
-    )
+    output = format_control_finding(finding, entity_label="Devices")
 
-    # A control with no affected entities should explicitly
-    # display 'None' rather than leaving the field blank.
-    assert 'Affected Devices: None' in output
+    assert "Affected Devices: None" in output
 
-    # Confirm that the PASS result is also preserved.
-    assert 'Result: PASS' in output
+    assert "Result: PASS" in output
 
 
+# Findings DataFrame tests
 
-# ------------------------------------------------------------------
-# TEST CONTROL FINDING FORMATTER
-# ------------------------------------------------------------------
 
 def test_build_findings_dataframe():
-    """
-    Verify that multiple structured control findings can be
-    combined into a DataFrame for reporting and export.
-    """
+    """Verify that structured findings are combined into a report DataFrame."""
     findings = [
         {
-            'control_id': 'IAM-01',
-            'requirement': 'All active user accounts must have MFA enabled.',
-            'result': 'FAIL',
-            'population_tested': 8,
-            'exception_count': 3,
-            'exception_rate': 37.5,
-            'affected_entities': ['mlopez', 'jparis', 'snguyen'],
-            'evidence_issue_count': 2
+            "control_id": "IAM-01",
+            "requirement": "All active user accounts must have MFA enabled.",
+            "result": "FAIL",
+            "population_tested": 8,
+            "exception_count": 3,
+            "exception_rate": 37.5,
+            "affected_entities": ["mlopez", "jparis", "snguyen"],
+            "evidence_issue_count": 2,
         },
         {
-            'control_id': 'END-02',
-            'requirement': (
-                'Company-managed endpoints must have '
-                'endpoint protection enabled.'
+            "control_id": "END-02",
+            "requirement": (
+                "Company-managed endpoints must have endpoint protection enabled."
             ),
-            'result': 'PASS',
-            'population_tested': 7,
-            'exception_count': 0,
-            'exception_rate': 0.0,
-            'affected_entities': [],
-            'evidence_issue_count': 0
-        }
+            "result": "PASS",
+            "population_tested": 7,
+            "exception_count": 0,
+            "exception_rate": 0.0,
+            "affected_entities": [],
+            "evidence_issue_count": 0,
+        },
     ]
 
-    # Convert the structured findings into a tabular DataFrame
-    # that can later be exported to a CSV file.
     findings_dataframe = build_findings_dataframe(findings)
 
-    # Both control findings should be represented as rows.
     assert len(findings_dataframe) == 2
 
-    # Control identifiers should remain in their original order.
-    assert findings_dataframe['control_id'].tolist() == [
-        'IAM-01',
-        'END-02'
-    ]
+    assert findings_dataframe["control_id"].tolist() == ["IAM-01", "END-02"]
 
-    # Important assessment results and metrics should be
-    # preserved in the tabular representation.
-    assert findings_dataframe['result'].tolist() == [
-        'FAIL',
-        'PASS'
-    ]
+    assert findings_dataframe["result"].tolist() == ["FAIL", "PASS"]
 
-    assert findings_dataframe['exception_count'].tolist() == [
-        3,
-        0
-    ]
+    assert findings_dataframe["exception_count"].tolist() == [3, 0]
 
-    # Affected entities should be converted from Python lists
-    # into clean, report-ready text.
-    assert findings_dataframe['affected_entities'].tolist() == [
-        'mlopez, jparis, snguyen',
-        ''
+    assert findings_dataframe["affected_entities"].tolist() == [
+        "mlopez, jparis, snguyen",
+        "",
     ]
 
 
+# Control result and risk severity tests
 
-# ============================================================
-# CONTROL RESULT AND RISK SEVERITY TESTS
-# ============================================================
 
 def test_passing_control_has_no_finding_severity():
-    """
-    Verify that a passing control does not receive an active
-    finding severity even when baseline risk ratings exist.
-    """
+    """Verify that PASS controls have no active severity despite baseline risk."""
+    assessable_population = pd.DataFrame(
+        [{"username": "jcarter"}, {"username": "akim"}]
+    )
 
-    # Create an assessable population with no control exceptions.
-    assessable_population = pd.DataFrame([
-        {'username': 'jcarter'},
-        {'username': 'akim'}
-    ])
+    exceptions = pd.DataFrame(columns=["username"])
 
-    # No records violate the control requirement.
-    exceptions = pd.DataFrame(columns=['username'])
-
-    # No evidence-quality issues prevent assessment.
-    evidence_issues = pd.DataFrame(columns=['username'])
+    evidence_issues = pd.DataFrame(columns=["username"])
 
     finding = build_control_finding(
-        control_id='TEST-01',
-        requirement='Test control requirement.',
+        control_id="TEST-01",
+        requirement="Test control requirement.",
         assessable_population=assessable_population,
         exceptions=exceptions,
         evidence_issues=evidence_issues,
-
-        # The underlying risk could be significant if
-        # this control were to fail.
         likelihood=4,
-        impact=4
+        impact=4,
     )
 
-    # The control itself passed.
-    assert finding['result'] == 'PASS'
+    assert finding["result"] == "PASS"
 
-    # Baseline risk ratings should remain available
-    # as contextual information.
-    assert finding['likelihood'] == 4
-    assert finding['impact'] == 4
+    # A passing control retains baseline ratings but has no active risk.
+    assert finding["likelihood"] == 4
+    assert finding["impact"] == 4
 
-    # A passing control should not generate an active
-    # risk score or finding severity.
-    assert finding['risk_score'] is None
-    assert finding['severity'] is None
+    assert finding["risk_score"] is None
+    assert finding["severity"] is None
 
 
+# Executive summary tests
 
-# ============================================================
-# EXECUTIVE SUMMARY
-# ============================================================
 
 def test_build_executive_summary():
-    """
-    Test that individual control findings are aggregated into
-    executive-level assessment metrics.
-    """
-
-    # Create representative control findings with different
-    # assessment results, exception counts, and risk severities.
+    """Verify that control findings are aggregated into executive metrics."""
     findings = [
         {
-            'control_id': 'IAM-01',
-            'result': 'FAIL',
-            'exception_count': 3,
-            'evidence_issue_count': 2,
-            'severity': 'HIGH'
+            "control_id": "IAM-01",
+            "result": "FAIL",
+            "exception_count": 3,
+            "evidence_issue_count": 2,
+            "severity": "HIGH",
         },
         {
-            'control_id': 'END-02',
-            'result': 'PASS',
-            'exception_count': 0,
-            'evidence_issue_count': 0,
-            'severity': None
+            "control_id": "END-02",
+            "result": "PASS",
+            "exception_count": 0,
+            "evidence_issue_count": 0,
+            "severity": None,
         },
         {
-            'control_id': 'TPR-01',
-            'result': 'NOT ASSESSED',
-            'exception_count': 0,
-            'evidence_issue_count': 1,
-            'severity': None
-        }
+            "control_id": "TPR-01",
+            "result": "NOT ASSESSED",
+            "exception_count": 0,
+            "evidence_issue_count": 1,
+            "severity": None,
+        },
     ]
 
-    # Build an executive summary from the individual
-    # control assessment results.
     summary = build_executive_summary(findings)
 
-    # Verify the overall control-assessment metrics.
-    assert summary['controls_assessed'] == 3
-    assert summary['passed'] == 1
-    assert summary['failed'] == 1
-    assert summary['not_assessed'] == 1
+    assert summary["controls_assessed"] == 3
+    assert summary["passed"] == 1
+    assert summary["failed"] == 1
+    assert summary["not_assessed"] == 1
 
-    # Verify aggregated exception and evidence-quality metrics.
-    assert summary['total_exceptions'] == 3
-    assert summary['evidence_issues'] == 3
+    # Evidence issues remain separate from confirmed exceptions.
+    assert summary["total_exceptions"] == 3
+    assert summary["evidence_issues"] == 3
 
-    # Verify executive-level severity counts.
-    assert summary['high_findings'] == 1
-    assert summary['critical_findings'] == 0
+    assert summary["high_findings"] == 1
+    assert summary["critical_findings"] == 0
 
 
 def test_format_executive_summary():
-    """
-    Test that executive-level assessment metrics are converted
-    into concise, human-readable management output.
-    """
-
-    # Create representative executive-level assessment metrics.
+    """Verify that executive metrics are formatted as a management table."""
     summary = {
-        'controls_assessed': 7,
-        'passed': 1,
-        'failed': 6,
-        'not_assessed': 0,
-        'total_exceptions': 9,
-        'evidence_issues': 4,
-        'high_findings': 6,
-        'critical_findings': 0
+        "controls_assessed": 7,
+        "passed": 1,
+        "failed": 6,
+        "not_assessed": 0,
+        "total_exceptions": 9,
+        "evidence_issues": 4,
+        "high_findings": 6,
+        "critical_findings": 0,
     }
 
-    # Format the structured metrics as a Markdown table.
     output = format_executive_summary(summary)
 
-    # Verify the table structure.
-    assert '| Metric | Result |' in output
-    assert '| --- | ---: |' in output
+    assert "| Metric | Result |" in output
+    assert "| --- | ---: |" in output
 
-    # Verify the executive metrics are represented correctly.
-    assert '| Controls Evaluated | 7 |' in output
-    assert '| Passed | 1 |' in output
-    assert '| Failed | 6 |' in output
-    assert '| Not Assessed | 0 |' in output
-    assert '| Total Exceptions | 9 |' in output
-    assert '| Evidence Issues | 4 |' in output
-    assert '| High Findings | 6 |' in output
-    assert '| Critical Findings | 0 |' in output
+    assert "| Controls Evaluated | 7 |" in output
+    assert "| Passed | 1 |" in output
+    assert "| Failed | 6 |" in output
+    assert "| Not Assessed | 0 |" in output
+    assert "| Total Exceptions | 9 |" in output
+    assert "| Evidence Issues | 4 |" in output
+    assert "| High Findings | 6 |" in output
+    assert "| Critical Findings | 0 |" in output
 
 
 def test_format_executive_assessment():
-    """
-    Test that executive-level assessment metrics are converted
-    into a concise narrative interpretation of the results.
-    """
-
-    # Create representative assessment metrics.
+    """Verify that executive metrics are summarized in a concise narrative."""
     summary = {
-        'controls_assessed': 7,
-        'passed': 1,
-        'failed': 6,
-        'not_assessed': 0,
-        'total_exceptions': 9,
-        'evidence_issues': 7,
-        'high_findings': 6,
-        'critical_findings': 0
+        "controls_assessed": 7,
+        "passed": 1,
+        "failed": 6,
+        "not_assessed": 0,
+        "total_exceptions": 9,
+        "evidence_issues": 7,
+        "high_findings": 6,
+        "critical_findings": 0,
     }
 
-    # Convert the structured metrics into an executive-level
-    # narrative assessment.
     assessment = format_executive_assessment(summary)
 
-    # Verify that the narrative communicates the overall
-    # control-assessment result.
-    assert 'Six of seven controls evaluated' in assessment
+    assert "Six of seven controls evaluated" in assessment
 
-    # Verify that remediation significance is communicated.
-    assert 'confirmed exceptions requiring remediation' in assessment
+    assert "confirmed exceptions requiring remediation" in assessment
 
-    # Verify that severity is summarized accurately.
-    assert 'No critical-severity findings were identified' in assessment
-    assert 'Six findings were rated High' in assessment
+    assert "No critical-severity findings were identified" in assessment
+    assert "Six findings were rated High" in assessment
 
 
-# ------------------------------------------------------------
-# MANAGEMENT FINDINGS
-# ------------------------------------------------------------
+# Management findings tests
+
 
 def test_build_management_findings():
-    """
-    Test that the management findings summary includes only
-    controls with confirmed FAIL results requiring remediation.
-    """
-
-    # Create representative findings covering failed, passed,
-    # and not-assessed control results.
+    """Verify that management findings include confirmed failures only."""
     findings = [
         {
-            'control_id': 'IAM-01',
-            'result': 'FAIL',
-            'severity': 'HIGH',
-            'affected_entities': ['mlopez', 'snguyen']
+            "control_id": "IAM-01",
+            "result": "FAIL",
+            "severity": "HIGH",
+            "affected_entities": ["mlopez", "snguyen"],
         },
         {
-            'control_id': 'END-02',
-            'result': 'PASS',
-            'severity': None,
-            'affected_entities': []
+            "control_id": "END-02",
+            "result": "PASS",
+            "severity": None,
+            "affected_entities": [],
         },
         {
-            'control_id': 'TPR-01',
-            'result': 'NOT ASSESSED',
-            'severity': None,
-            'affected_entities': []
+            "control_id": "TPR-01",
+            "result": "NOT ASSESSED",
+            "severity": None,
+            "affected_entities": [],
         },
         {
-            'control_id': 'TPR-02',
-            'result': 'FAIL',
-            'severity': 'HIGH',
-            'affected_entities': ['VND-002']
-        }
+            "control_id": "TPR-02",
+            "result": "FAIL",
+            "severity": "HIGH",
+            "affected_entities": ["VND-002"],
+        },
     ]
 
-    # Build the management view containing only confirmed
-    # control failures that require remediation.
     management_findings = build_management_findings(findings)
 
-    # Verify that only failed controls are included.
     assert len(management_findings) == 2
-    assert management_findings[0]['control_id'] == 'IAM-01'
-    assert management_findings[1]['control_id'] == 'TPR-02'
+    assert management_findings[0]["control_id"] == "IAM-01"
+    assert management_findings[1]["control_id"] == "TPR-02"
 
-    # Verify that PASS and NOT ASSESSED controls are excluded
-    # from the remediation-focused management view.
-    assert all(
-        finding['result'] == 'FAIL'
-        for finding in management_findings
-    )
+    assert all(finding["result"] == "FAIL" for finding in management_findings)
 
 
 def test_format_management_findings():
-    """
-    Test that failed control findings are converted into a concise,
-    actionable management remediation summary.
-    """
-
-    # Create representative failed findings containing the
-    # information management needs to understand and remediate
-    # each confirmed control deficiency.
+    """Verify that failed findings are formatted as remediation summaries."""
     management_findings = [
         {
-            'control_id': 'IAM-01',
-            'severity': 'HIGH',
-            'affected_entities': ['mlopez', 'snguyen'],
-            'finding_description': (
-                'Active user accounts were identified without MFA enabled.'
+            "control_id": "IAM-01",
+            "severity": "HIGH",
+            "affected_entities": ["mlopez", "snguyen"],
+            "finding_description": (
+                "Active user accounts were identified without MFA enabled."
             ),
-            'recommendation': (
-                'Enable MFA for all active user accounts and verify enrollment.'
-            )
+            "recommendation": (
+                "Enable MFA for all active user accounts and verify enrollment."
+            ),
         },
         {
-            'control_id': 'TPR-02',
-            'severity': 'HIGH',
-            'affected_entities': ['VND-002'],
-            'finding_description': (
-                'Third-party vendors with privileged access were identified '
-                'without MFA enabled.'
+            "control_id": "TPR-02",
+            "severity": "HIGH",
+            "affected_entities": ["VND-002"],
+            "finding_description": (
+                "Third-party vendors with privileged access were identified "
+                "without MFA enabled."
             ),
-            'recommendation': (
-                'Require MFA for all third-party vendors with privileged access.'
-            )
-        }
+            "recommendation": (
+                "Require MFA for all third-party vendors with privileged access."
+            ),
+        },
     ]
 
-    # Format the failed findings into a management-readable
-    # remediation summary.
     output = format_management_findings(management_findings)
 
-    # Verify that each failed control and its severity are shown.
-    assert '### IAM-01 | HIGH' in output
-    assert '### TPR-02 | HIGH' in output
+    assert "### IAM-01 | HIGH" in output
+    assert "### TPR-02 | HIGH" in output
 
-    # Verify that the affected entities are identified.
-    assert '**Affected:** mlopez, snguyen' in output
-    assert '**Affected:** VND-002' in output
+    assert "**Affected:** mlopez, snguyen" in output
+    assert "**Affected:** VND-002" in output
 
-    # Verify that management receives both the finding context
-    # and the recommended remediation action.
     assert (
-        '**Finding:** Active user accounts were identified without MFA enabled.'
+        "**Finding:** Active user accounts were identified without MFA enabled."
         in output
     )
     assert (
-        '**Recommendation:** Enable MFA for all active user accounts '
-        'and verify enrollment.'
-        in output
+        "**Recommendation:** Enable MFA for all active user accounts "
+        "and verify enrollment." in output
     )
 
 
+# Management report tests
 
-# ------------------------------------------------------------
-# MANAGEMENT REPORT
-# ------------------------------------------------------------
 
 def test_generate_management_report():
-    """
-    Test that executive metrics and remediation findings are
-    assembled into a complete Markdown management report.
-    """
-
-    # Create representative executive-level assessment metrics.
+    """Verify that metrics and remediation findings form a Markdown report."""
     executive_summary = {
-        'controls_assessed': 3,
-        'passed': 1,
-        'failed': 2,
-        'not_assessed': 0,
-        'total_exceptions': 3,
-        'evidence_issues': 1,
-        'high_findings': 2,
-        'critical_findings': 0
+        "controls_assessed": 3,
+        "passed": 1,
+        "failed": 2,
+        "not_assessed": 0,
+        "total_exceptions": 3,
+        "evidence_issues": 1,
+        "high_findings": 2,
+        "critical_findings": 0,
     }
 
-    # Create representative failed controls requiring
-    # management remediation.
     management_findings = [
         {
-            'control_id': 'IAM-01',
-            'severity': 'HIGH',
-            'affected_entities': ['mlopez', 'snguyen'],
-            'finding_description': (
-                'Active user accounts were identified without MFA enabled.'
+            "control_id": "IAM-01",
+            "severity": "HIGH",
+            "affected_entities": ["mlopez", "snguyen"],
+            "finding_description": (
+                "Active user accounts were identified without MFA enabled."
             ),
-            'recommendation': (
-                'Enable MFA for all active user accounts and verify enrollment.'
-            )
+            "recommendation": (
+                "Enable MFA for all active user accounts and verify enrollment."
+            ),
         },
         {
-            'control_id': 'TPR-02',
-            'severity': 'HIGH',
-            'affected_entities': ['VND-002'],
-            'finding_description': (
-                'Third-party vendors with privileged access were identified '
-                'without MFA enabled.'
+            "control_id": "TPR-02",
+            "severity": "HIGH",
+            "affected_entities": ["VND-002"],
+            "finding_description": (
+                "Third-party vendors with privileged access were identified "
+                "without MFA enabled."
             ),
-            'recommendation': (
-                'Require MFA for all third-party vendors with privileged access.'
-            )
-        }
+            "recommendation": (
+                "Require MFA for all third-party vendors with privileged access."
+            ),
+        },
     ]
 
-    # Generate the Markdown management report.
-    report = generate_management_report(
-        executive_summary,
-        management_findings
-    )
+    report = generate_management_report(executive_summary, management_findings)
 
-    # Verify the report identity and major sections.
-    assert '# Northstar BuildCo' in report
-    assert '## Cybersecurity Control Assurance Assessment' in report
-    assert '## Executive Summary' in report
-    assert '## Findings Requiring Remediation' in report
+    assert "# Northstar BuildCo" in report
+    assert "## Cybersecurity Control Assurance Assessment" in report
+    assert "## Executive Summary" in report
+    assert "## Findings Requiring Remediation" in report
 
-    # Verify that calculated executive metrics are included
-    # using the Markdown table format.
-    assert '| Controls Evaluated | 3 |' in report
-    assert '| Passed | 1 |' in report
-    assert '| Failed | 2 |' in report
-
-    # Verify that the executive summary includes a narrative
-    # interpretation of the assessment results.
-    assert (
-        'Two of three controls evaluated resulted in confirmed '
-        'exceptions requiring remediation.'
-        in report
-    )
-
-    assert 'No critical-severity findings were identified.' in report
+    assert "| Controls Evaluated | 3 |" in report
+    assert "| Passed | 1 |" in report
+    assert "| Failed | 2 |" in report
 
     assert (
-        'Two findings were rated High based on the defined '
-        'Northstar BuildCo risk criteria.'
-        in report
+        "Two of three controls evaluated resulted in confirmed "
+        "exceptions requiring remediation." in report
     )
 
-    # Verify that remediation findings are included.
-    assert '### IAM-01 | HIGH' in report
-    assert '### TPR-02 | HIGH' in report
+    assert "No critical-severity findings were identified." in report
+
     assert (
-        '**Recommendation:** Enable MFA for all active user accounts '
-        'and verify enrollment.'
-        in report
+        "Two findings were rated High based on the defined "
+        "Northstar BuildCo risk criteria." in report
+    )
+
+    assert "### IAM-01 | HIGH" in report
+    assert "### TPR-02 | HIGH" in report
+    assert (
+        "**Recommendation:** Enable MFA for all active user accounts "
+        "and verify enrollment." in report
     )
 
 
 def test_generate_management_report_includes_assessment_context():
-    """
-    Test that the management report includes basic assessment
-    context before presenting assessment results.
-    """
-
-    # Create representative executive-level assessment metrics.
+    """Verify that the management report includes assessment context."""
     executive_summary = {
-        'controls_assessed': 3,
-        'passed': 1,
-        'failed': 2,
-        'not_assessed': 0,
-        'total_exceptions': 3,
-        'evidence_issues': 1,
-        'high_findings': 2,
-        'critical_findings': 0
+        "controls_assessed": 3,
+        "passed": 1,
+        "failed": 2,
+        "not_assessed": 0,
+        "total_exceptions": 3,
+        "evidence_issues": 1,
+        "high_findings": 2,
+        "critical_findings": 0,
     }
 
-    # No remediation findings are required to test the
-    # assessment-context section itself.
     management_findings = []
 
-    # Generate the management report with assessment context.
     report = generate_management_report(
         executive_summary,
         management_findings,
-        assessment_date='October 2026',
+        assessment_date="October 2026",
         assessment_scope=(
-            'Identity and Access Management, Endpoint Security, '
-            'and Third-Party Risk'
+            "Identity and Access Management, Endpoint Security, and Third-Party Risk"
         ),
-        framework_alignment='NIST Cybersecurity Framework (CSF) 2.0'
+        framework_alignment="NIST Cybersecurity Framework (CSF) 2.0",
     )
 
-    # Verify that the assessment context is presented near
-    # the beginning of the management report.
-    assert '**Assessment Date:** October 2026' in report
+    assert "**Assessment Date:** October 2026" in report
 
     assert (
-        '**Assessment Scope:** Identity and Access Management, '
-        'Endpoint Security, and Third-Party Risk'
-        in report
+        "**Assessment Scope:** Identity and Access Management, "
+        "Endpoint Security, and Third-Party Risk" in report
     )
 
-    assert (
-        '**Framework Alignment:** '
-        'NIST Cybersecurity Framework (CSF) 2.0'
-        in report
-    )
+    assert "**Framework Alignment:** NIST Cybersecurity Framework (CSF) 2.0" in report
 
 
 def test_export_management_report(tmp_path):
-    """
-    Test that a generated Markdown management report is written
-    to the specified output file.
-    """
-
-    # Create representative Markdown report content.
+    """Verify that a Markdown report is written to the specified file."""
     report = (
-        '# Northstar BuildCo\n\n'
-        '## Cybersecurity Control Assurance Assessment\n\n'
-        '## Executive Summary\n\n'
-        'Controls Evaluated: 7'
+        "# Northstar BuildCo\n\n"
+        "## Cybersecurity Control Assurance Assessment\n\n"
+        "## Executive Summary\n\n"
+        "Controls Evaluated: 7"
     )
 
-    # Use pytest's temporary directory so the test does not
-    # create or modify files in the real project output folder.
-    output_file = tmp_path / 'management_report.md'
+    # Keep exported test output isolated from the project output folder.
+    output_file = tmp_path / "management_report.md"
 
-    # Export the generated management report.
-    export_management_report(
-        report,
-        output_file
-    )
+    export_management_report(report, output_file)
 
-    # Verify that the report file was created.
     assert output_file.exists()
 
-    # Verify that the exported file contains exactly the
-    # Markdown content supplied to the export function.
     assert output_file.read_text() == report
 
 
+# Findings CSV export tests
 
-# ============================================================
-# FINDINGS CSV EXPORT TESTS
-# ============================================================
 
 def test_export_findings_csv(tmp_path):
-    """
-    Verify that a findings DataFrame can be exported to a CSV file.
-    """
-    findings_dataframe = pd.DataFrame([
-        {
-            'control_id': 'IAM-01',
-            'result': 'FAIL',
-            'population_tested': 8,
-            'exception_count': 3,
-            'exception_rate': 37.5,
-            'evidence_issue_count': 2
-        },
-        {
-            'control_id': 'END-02',
-            'result': 'PASS',
-            'population_tested': 7,
-            'exception_count': 0,
-            'exception_rate': 0.0,
-            'evidence_issue_count': 0
-        }
-    ])
-
-    # Create a temporary output path supplied by pytest.
-    #
-    # Using tmp_path prevents the test from creating or overwriting
-    # files in the project's real output directory.
-    output_file = tmp_path / 'control_findings.csv'
-
-    # Export the findings DataFrame to the temporary CSV file.
-    export_findings_csv(
-        findings_dataframe,
-        output_file
+    """Verify that findings can be exported to a CSV file."""
+    findings_dataframe = pd.DataFrame(
+        [
+            {
+                "control_id": "IAM-01",
+                "result": "FAIL",
+                "population_tested": 8,
+                "exception_count": 3,
+                "exception_rate": 37.5,
+                "evidence_issue_count": 2,
+            },
+            {
+                "control_id": "END-02",
+                "result": "PASS",
+                "population_tested": 7,
+                "exception_count": 0,
+                "exception_rate": 0.0,
+                "evidence_issue_count": 0,
+            },
+        ]
     )
 
-    # Verify that the export actually created the file.
+    output_file = tmp_path / "control_findings.csv"
+
+    export_findings_csv(findings_dataframe, output_file)
+
     assert output_file.exists()
 
-    # Load the exported CSV back into pandas so that we can
-    # verify the data survived the export process correctly.
     exported_findings = pd.read_csv(output_file)
 
     assert len(exported_findings) == 2
 
-    assert exported_findings['control_id'].tolist() == [
-        'IAM-01',
-        'END-02'
-    ]
+    assert exported_findings["control_id"].tolist() == ["IAM-01", "END-02"]
 
-    assert exported_findings['result'].tolist() == [
-        'FAIL',
-        'PASS'
-    ]
+    assert exported_findings["result"].tolist() == ["FAIL", "PASS"]
 
 
-
-# ============================================================
-# HTML MANAGEMENT REPORT TESTS
-# ============================================================
+# HTML management report tests
 
 
 def test_format_html_report_returns_complete_html_document():
     """HTML management report should return a complete HTML document."""
-
-    # The initial HTML formatter does not yet use finding data,
-    # so an empty list is sufficient for this structural test.
     report = format_html_report([])
 
-    # Verify the basic HTML document structure and report identity.
-    assert '<!DOCTYPE html>' in report
+    assert "<!DOCTYPE html>" in report
     assert '<html lang="en">' in report
-    assert '<title>Control Assurance Engine | Management Report</title>' in report
-    # Verify that the report title includes its SVG icon.
-    # The icon must appear inside the H1 element.
+    assert "<title>Control Assurance Engine | Management Report</title>" in report
     assert '<h1><svg class="report-icon"' in report
-    assert 'Control Assurance Engine</h1>' in report
+    assert "Control Assurance Engine</h1>" in report
 
-    # Verify the assessed organization's name
-    assert 'Northstar BuildCo' in report
-    assert '</html>' in report
+    assert "Northstar BuildCo" in report
+    assert "</html>" in report
 
 
 def test_format_html_report_uses_executive_summary_metrics():
     """HTML report should display metrics derived from control findings."""
-
-    # Create representative findings containing the fields required
-    # by the existing executive-summary aggregation function.
     findings = [
         {
-            'control_id': 'END-02',
-            'requirement': (
-                'Company-managed endpoints must have endpoint '
-                'protection enabled.'
+            "control_id": "END-02",
+            "requirement": (
+                "Company-managed endpoints must have endpoint protection enabled."
             ),
-            'nist_csf_subcategory': 'PR.PS-05',
-            'result': 'PASS',
-            'population_tested': 7,
-            'exception_count': 0,
-            'exception_rate': 0.0,
-            'evidence_issue_count': 0,
-            'risk_score': None,
-            'severity': None
+            "nist_csf_subcategory": "PR.PS-05",
+            "result": "PASS",
+            "population_tested": 7,
+            "exception_count": 0,
+            "exception_rate": 0.0,
+            "evidence_issue_count": 0,
+            "risk_score": None,
+            "severity": None,
         },
         {
-            'control_id': 'IAM-01',
-            'requirement': 'All active user accounts must have MFA enabled.',
-            'nist_csf_subcategory': 'PR.AA-03',
-            'result': 'FAIL',
-            'population_tested': 8,
-            'exception_count': 2,
-            'exception_rate': 25.0,
-            'evidence_issue_count': 2,
-            'risk_score': 16,
-            'severity': 'HIGH',
-
-            # Remediation details used by the management-findings section.
-            'finding_description': (
-                'Active user accounts were identified without MFA enabled.'
+            "control_id": "IAM-01",
+            "requirement": "All active user accounts must have MFA enabled.",
+            "nist_csf_subcategory": "PR.AA-03",
+            "result": "FAIL",
+            "population_tested": 8,
+            "exception_count": 2,
+            "exception_rate": 25.0,
+            "evidence_issue_count": 2,
+            "risk_score": 16,
+            "severity": "HIGH",
+            "finding_description": (
+                "Active user accounts were identified without MFA enabled."
             ),
-            'affected_entities': ['mlopez', 'jparis'],
-            'recommendation': (
-                'Enable MFA for all active user accounts and verify enrollment.'
+            "affected_entities": ["mlopez", "jparis"],
+            "recommendation": (
+                "Enable MFA for all active user accounts and verify enrollment."
             ),
-        }
+        },
     ]
 
-    # Generate the complete HTML report from the representative findings.
     report = format_html_report(findings)
 
-    # Verify that the complete report also incorporates the
-    # detailed control-results section.
-    # Verify the Control Results heading with its SVG icon.
-    assert '<h2>' in report
-    assert 'Control Results</h2>' in report
-    assert 'END-02' in report
-    assert 'IAM-01' in report
-    assert 'PR.PS-05' in report
-    assert 'PR.AA-03' in report
+    assert "<h2>" in report
+    assert "Control Results</h2>" in report
+    assert "END-02" in report
+    assert "IAM-01" in report
+    assert "PR.PS-05" in report
+    assert "PR.AA-03" in report
 
     report = format_html_report(findings)
 
-    # Verify that aggregated assessment values appear alongside
-    # their corresponding management-report labels.
-    assert '2' in report
-    assert 'Controls Evaluated' in report
+    assert "2" in report
+    assert "Controls Evaluated" in report
 
-    assert '1' in report
-    assert 'Passed' in report
-    assert 'Failed' in report
+    assert "1" in report
+    assert "Passed" in report
+    assert "Failed" in report
 
-    assert '2' in report
-    assert 'Total Exceptions' in report
+    assert "2" in report
+    assert "Total Exceptions" in report
 
-    assert '2' in report
-    assert 'Evidence Issues' in report
+    assert "2" in report
+    assert "Evidence Issues" in report
 
-    assert '1' in report
-    assert 'High Findings' in report
+    assert "1" in report
+    assert "High Findings" in report
 
-    assert '0' in report
-    assert 'Critical Findings' in report
+    assert "0" in report
+    assert "Critical Findings" in report
 
 
 def test_format_html_control_results_pass_has_no_active_risk():
     """PASS controls should not be assigned an active risk severity or score."""
-
-    # A passing control has no confirmed control exception and
-    # therefore no active risk severity or risk score.
     findings = [
         {
-            'control_id': 'END-02',
-            'requirement': (
-                'Company-managed endpoints must have endpoint '
-                'protection enabled.'
+            "control_id": "END-02",
+            "requirement": (
+                "Company-managed endpoints must have endpoint protection enabled."
             ),
-            'nist_csf_subcategory': 'PR.PS-05',
-            'result': 'PASS',
-            'population_tested': 7,
-            'exception_count': 0,
-            'exception_rate': 0.0,
-            'evidence_issue_count': 0,
-            'risk_score': None,
-            'severity': None
+            "nist_csf_subcategory": "PR.PS-05",
+            "result": "PASS",
+            "population_tested": 7,
+            "exception_count": 0,
+            "exception_rate": 0.0,
+            "evidence_issue_count": 0,
+            "risk_score": None,
+            "severity": None,
         }
     ]
 
     report = format_html_control_results(findings)
 
-    # Verify the control is correctly presented as passing.
-    assert 'END-02' in report
-    assert 'PASS' in report
-    assert 'PR.PS-05' in report
+    assert "END-02" in report
+    assert "PASS" in report
+    assert "PR.PS-05" in report
 
-    # Severity and risk score should be represented as unavailable,
-    # rather than incorrectly implying that PASS equals LOW risk.
-    assert report.count('N/A') == 2
+    # PASS does not imply LOW risk; no active risk rating is assigned.
+    assert report.count("N/A") == 2
 
 
 def test_format_html_control_results_includes_control_data():
     """HTML control results should display assessment and risk data."""
-
-    # Create one representative failed control finding using the
-    # same fields produced by the control-assessment pipeline.
     findings = [
         {
-            'control_id': 'IAM-01',
-            'requirement': 'All active user accounts must have MFA enabled.',
-            'nist_csf_subcategory': 'PR.AA-03',
-            'result': 'FAIL',
-            'population_tested': 8,
-            'exception_count': 3,
-            'exception_rate': 37.5,
-            'evidence_issue_count': 2,
-            'risk_score': 16,
-            'severity': 'HIGH'
+            "control_id": "IAM-01",
+            "requirement": "All active user accounts must have MFA enabled.",
+            "nist_csf_subcategory": "PR.AA-03",
+            "result": "FAIL",
+            "population_tested": 8,
+            "exception_count": 3,
+            "exception_rate": 37.5,
+            "evidence_issue_count": 2,
+            "risk_score": 16,
+            "severity": "HIGH",
         }
     ]
 
     report = format_html_control_results(findings)
 
-    # Verify that the control identity and requirement are present.
-    assert 'IAM-01' in report
-    assert 'All active user accounts must have MFA enabled.' in report
+    assert "IAM-01" in report
+    assert "All active user accounts must have MFA enabled." in report
 
-    # Verify that assessment and framework information is present.
-    assert 'FAIL' in report
-    assert 'HIGH' in report
-    assert 'PR.AA-03' in report
+    assert "FAIL" in report
+    assert "HIGH" in report
+    assert "PR.AA-03" in report
 
-    # Verify that the calculated control metrics are presented.
-    assert '37.5%' in report
-    assert 'Population Tested' in report
-    assert 'Exceptions' in report
-    assert 'Evidence Issues' in report
-    assert 'Risk Score' in report
+    assert "37.5%" in report
+    assert "Population Tested" in report
+    assert "Exceptions" in report
+    assert "Evidence Issues" in report
+    assert "Risk Score" in report
 
 
 def test_format_html_management_findings_includes_remediation_details():
     """HTML management findings should include actionable remediation data."""
     management_findings = [
         {
-            'control_id': 'IAM-01',
-            'severity': 'HIGH',
-            'finding_description': (
-                'Active user accounts were identified without MFA enabled.'
+            "control_id": "IAM-01",
+            "severity": "HIGH",
+            "finding_description": (
+                "Active user accounts were identified without MFA enabled."
             ),
-            'affected_entities': ['mlopez', 'jparis'],
-            'recommendation': (
-                'Enable MFA for all active user accounts and verify enrollment.'
-            )
+            "affected_entities": ["mlopez", "jparis"],
+            "recommendation": (
+                "Enable MFA for all active user accounts and verify enrollment."
+            ),
         }
     ]
 
     report = format_html_management_findings(management_findings)
 
-    assert 'IAM-01' in report
-    assert 'HIGH' in report
-    assert 'Active user accounts were identified without MFA enabled.' in report
-    assert 'mlopez, jparis' in report
-    assert 'Enable MFA for all active user accounts' in report
-    assert 'Finding' in report
-    assert 'Affected' in report
-    assert 'Recommendation' in report
+    assert "IAM-01" in report
+    assert "HIGH" in report
+    assert "Active user accounts were identified without MFA enabled." in report
+    assert "mlopez, jparis" in report
+    assert "Enable MFA for all active user accounts" in report
+    assert "Finding" in report
+    assert "Affected" in report
+    assert "Recommendation" in report
 
 
 def test_format_html_control_outcomes_uses_summary_metrics():
     """Control-outcome visual should use existing executive metrics."""
-    summary = {
-        'controls_assessed': 7,
-        'passed': 1,
-        'failed': 6,
-        'not_assessed': 0
-    }
+    summary = {"controls_assessed": 7, "passed": 1, "failed": 6, "not_assessed": 0}
 
     report = format_html_control_outcomes(summary)
 
-    assert 'Control Outcomes' in report
-    assert 'Passed' in report
-    assert 'Failed' in report
-    assert 'Not Assessed' in report
-    assert 'width: 14.3%' in report
-    assert 'width: 85.7%' in report
-    assert 'width: 0.0%' in report
+    assert "Control Outcomes" in report
+    assert "Passed" in report
+    assert "Failed" in report
+    assert "Not Assessed" in report
+    assert "width: 14.3%" in report
+    assert "width: 85.7%" in report
+    assert "width: 0.0%" in report
 
 
 def test_format_html_finding_severity_uses_summary_metrics():
     """Finding-severity visual should use existing severity metrics."""
-    summary = {
-        'high_findings': 6,
-        'critical_findings': 0
-    }
+    summary = {"high_findings": 6, "critical_findings": 0}
 
     report = format_html_finding_severity(summary)
 
-    assert 'Finding Severity' in report
-    assert 'High' in report
-    assert 'Critical' in report
-    assert 'width: 100.0%' in report
-    assert 'width: 0.0%' in report
+    assert "Finding Severity" in report
+    assert "High" in report
+    assert "Critical" in report
+    assert "width: 100.0%" in report
+    assert "width: 0.0%" in report
 
 
 def test_format_html_evidence_comparison_uses_finding_counts():
     """Evidence comparison should preserve exception and evidence counts."""
     findings = [
-        {
-            'control_id': 'IAM-01',
-            'exception_count': 3,
-            'evidence_issue_count': 2
-        },
-        {
-            'control_id': 'IAM-02',
-            'exception_count': 1,
-            'evidence_issue_count': 0
-        }
+        {"control_id": "IAM-01", "exception_count": 3, "evidence_issue_count": 2},
+        {"control_id": "IAM-02", "exception_count": 1, "evidence_issue_count": 0},
     ]
 
     report = format_html_evidence_comparison(findings)
 
-    assert 'Exceptions vs. Evidence Issues by Control' in report
-    assert 'IAM-01' in report
-    assert 'IAM-02' in report
-    assert 'Exceptions' in report
-    assert 'Evidence Issues' in report
+    assert "Exceptions vs. Evidence Issues by Control" in report
+    assert "IAM-01" in report
+    assert "IAM-02" in report
+    assert "Exceptions" in report
+    assert "Evidence Issues" in report
 
     # Bars are normalized to the largest count in the findings.
-    assert 'width: 100.0%' in report
-    assert 'width: 66.7%' in report
-    assert 'width: 33.3%' in report
-    assert 'width: 0.0%' in report
+    assert "width: 100.0%" in report
+    assert "width: 66.7%" in report
+    assert "width: 33.3%" in report
+    assert "width: 0.0%" in report
 
 
 def test_format_html_report_includes_assessment_context():
     """HTML management report should include assessment context."""
     report = format_html_report(
         [],
-        assessment_date='October 2026',
+        assessment_date="October 2026",
         assessment_scope=(
-            'Identity and Access Management, Endpoint Security, '
-            'and Third-Party Risk'
+            "Identity and Access Management, Endpoint Security, and Third-Party Risk"
         ),
-        framework_alignment='NIST Cybersecurity Framework (CSF) 2.0'
+        framework_alignment="NIST Cybersecurity Framework (CSF) 2.0",
     )
 
-    assert 'October 2026' in report
+    assert "October 2026" in report
     assert (
-        'Identity and Access Management, Endpoint Security, '
-        'and Third-Party Risk'
+        "Identity and Access Management, Endpoint Security, and Third-Party Risk"
     ) in report
-    assert 'NIST Cybersecurity Framework (CSF) 2.0' in report
+    assert "NIST Cybersecurity Framework (CSF) 2.0" in report

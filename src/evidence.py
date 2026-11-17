@@ -1,64 +1,47 @@
+"""
+Load and validate security control evidence from CSV files.
+
+Define required evidence schemas and validate user-account,
+endpoint, and third-party vendor records.
+"""
+
 import pandas as pd
 
-
-# ============================================================
-# USER EVIDENCE CONFIGURATION
-# ============================================================
-
-# Define the minimum fields required for user-account evidence.
-#
-# A set is useful here because we'll later compare these required
-# fields against the columns actually present in the CSV.
+# User evidence configuration
+# Required fields for evaluating identity and access management controls.
 REQUIRED_USER_COLUMNS = {
-    'username',
-    'first_name',
-    'last_name',
-    'email_address',
-    'department',
-    'employment_status',
-    'enabled',
-    'mfa_enabled',
-    'is_admin',
-    'admin_approved'
+    "username",
+    "first_name",
+    "last_name",
+    "email_address",
+    "department",
+    "employment_status",
+    "enabled",
+    "mfa_enabled",
+    "is_admin",
+    "admin_approved",
 }
 
-# Define the employment-status values recognized by the
-# Northstar user-evidence model.
-#
-# Blank values are not included here because they represent
-# missing evidence rather than an invalid status.
-VALID_EMPLOYMENT_STATUSES = {
-    'active',
-    'terminated',
-    'leave'
-}
+# Blank statuses represent missing evidence, not invalid employment values.
+VALID_EMPLOYMENT_STATUSES = {"active", "terminated", "leave"}
 
 
-
-# ============================================================
-# DEVICE EVIDENCE CONFIGURATION
-# ============================================================
-
-# Define the columns required in endpoint evidence.
-#
-# These fields provide the evidence needed by the endpoint
-# controls that the Control Assurance Engine will support.
+# Device evidence configuration
+# Required fields for evaluating endpoint security controls.
 REQUIRED_DEVICE_COLUMNS = {
-    'device_id',
-    'device_name',
-    'assigned_user',
-    'device_type',
-    'operating_system',
-    'company_managed',
-    'disk_encrypted',
-    'endpoint_protection'
+    "device_id",
+    "device_name",
+    "assigned_user",
+    "device_type",
+    "operating_system",
+    "company_managed",
+    "disk_encrypted",
+    "endpoint_protection",
 }
 
 
+# User evidence loader
 
-# ============================================================
-# USER EVIDENCE LOADER
-# ============================================================
 
 def load_user_evidence(filepath):
     """
@@ -73,98 +56,43 @@ def load_user_evidence(filepath):
             User-account evidence loaded into a pandas DataFrame.
     """
 
-    # Read the CSV file into a pandas DataFrame.
-    #
-    # pandas will use the CSV header row as the DataFrame's
-    # column names and each subsequent row as an account record.
     users = pd.read_csv(filepath)
 
-    # Determine whether any required evidence fields are missing.
-    #
-    # set(users.columns) converts the actual CSV column names into a set.
-    # Subtracting it from REQUIRED_USER_COLUMNS leaves only the fields
-    # that we expected but did not receive.
+    # Identify required fields missing from the supplied CSV schema.
     missing_columns = REQUIRED_USER_COLUMNS - set(users.columns)
 
-    # If the set contains anything, the evidence schema is incomplete.
     if missing_columns:
-        # Sort the names so the error message remains predictable,
-        # especially if multiple columns are missing.
-        missing_list = ', '.join(sorted(missing_columns))
+        # Sort column names for deterministic error messages.
+        missing_list = ", ".join(sorted(missing_columns))
+        raise ValueError(f"Missing required columns: {missing_list}")
 
-        # Stop processing and explain exactly which evidence fields
-        # are missing.
-        raise ValueError(
-            f'Missing required columns: {missing_list}'
-        )
+    # Blank Boolean fields represent missing evidence, not malformed values.
+    boolean_columns = ["enabled", "mfa_enabled", "is_admin", "admin_approved"]
 
-    # Define the columns that should contain only Boolean values.
-    #
-    # Blank values are allowed because they represent missing evidence
-    # that the control-assessment layer will handle separately.
-    boolean_columns = [
-        'enabled',
-        'mfa_enabled',
-        'is_admin',
-        'admin_approved']
-
-    # Validate each Boolean field independently.
     for column in boolean_columns:
-
-        # Remove missing values before checking the remaining values.
-        #
-        # .dropna() is important because a blank value is not considered
-        # malformed evidence in our model. It represents missing evidence.
+        # Exclude missing evidence from Boolean type validation.
         non_null_values = users[column].dropna()
 
-        # Check whether every non-null value is an actual Boolean.
-        #
-        # isinstance(value, bool) returns True only when the value
-        # is a Python Boolean such as True or False.
-        valid_values = non_null_values.map(
-            lambda value: isinstance(value, bool)
-        )
+        valid_values = non_null_values.map(lambda value: isinstance(value, bool))
 
-        # If even one value is not Boolean, reject the evidence file.
-        #
-        # .all() returns True only when every value in the Series is True.
         if not valid_values.all():
-            raise ValueError(
-                f"Invalid Boolean value in column '{column}'"
-            )
+            raise ValueError(f"Invalid Boolean value in column '{column}'")
 
-    # Validate employment-status values.
-    #
-    # dropna() intentionally removes blank values from this validation.
-    # A blank employment status represents missing evidence and can be
-    # handled later by the relevant control assessment.
-    non_null_statuses = users['employment_status'].dropna()
+    # Exclude missing employment statuses from value validation.
+    # Missing statuses are handled by the control-assessment layer.
+    non_null_statuses = users["employment_status"].dropna()
 
-    # Identify any values that are not part of Northstar's approved
-    # employment-status vocabulary.
-    invalid_statuses = ~non_null_statuses.isin(
-        VALID_EMPLOYMENT_STATUSES
-    )
+    invalid_statuses = ~non_null_statuses.isin(VALID_EMPLOYMENT_STATUSES)
 
-    # Reject the evidence file if any unsupported status is present.
-    #
-    # This prevents spelling mistakes or unexpected values such as
-    # 'former', 'inactive', or 'fired' from silently changing the
-    # scope of an IAM control.
+    # Reject unsupported statuses to prevent incorrect IAM assessment scope.
     if invalid_statuses.any():
-        raise ValueError(
-            "Invalid value in column 'employment_status'"
-        )
+        raise ValueError("Invalid value in column 'employment_status'")
 
-    # Return the loaded evidence so that other parts of the
-    # assessment engine can evaluate security controls against it.
     return users
 
 
+# Device evidence loader
 
-# ============================================================
-# DEVICE EVIDENCE LOADER
-# ============================================================
 
 def load_device_evidence(filepath):
     """
@@ -179,149 +107,86 @@ def load_device_evidence(filepath):
             Validated device evidence.
     """
 
-    # Load the device evidence into a pandas DataFrame.
     devices = pd.read_csv(filepath)
 
-
-    # Determine whether any required device-evidence columns
-    # are missing from the CSV.
     missing_columns = REQUIRED_DEVICE_COLUMNS - set(devices.columns)
 
-    # Reject the evidence if the required schema is incomplete.
-    #
-    # Sorting the missing columns makes the resulting error
-    # message predictable and easier to read.
+    # Sort missing column names for deterministic error messages.
     if missing_columns:
         missing_list = sorted(missing_columns)
 
-        raise ValueError(
-            f'Missing required columns: {missing_list}'
-        )
+        raise ValueError(f"Missing required columns: {missing_list}")
 
-    # Define the device fields that must contain Boolean values
-    # whenever evidence is present.
-    #
-    # Blank values are permitted because missing evidence will
-    # later be handled separately by the relevant control.
-    boolean_columns = [
-        'company_managed',
-        'disk_encrypted',
-        'endpoint_protection'
-    ]
+    # Missing Boolean values are handled by the control-assessment layer.
+    boolean_columns = ["company_managed", "disk_encrypted", "endpoint_protection"]
 
-    # Validate each Boolean device-evidence field.
     for column in boolean_columns:
-
-        # Remove blank values before validating the remaining data.
-        #
-        # This distinguishes missing evidence from invalid evidence.
+        # Exclude missing evidence from Boolean type validation.
         non_null_values = devices[column].dropna()
 
-        # Check that every non-blank value was interpreted as
-        # a Boolean value by pandas.
-        valid_values = non_null_values.map(
-            lambda value: isinstance(value, bool)
-        )
+        valid_values = non_null_values.map(lambda value: isinstance(value, bool))
 
-        # Reject unsupported values such as 'yes', 'encrypted',
-        # or 'managed' rather than allowing ambiguous evidence
-        # into the control-assessment engine.
+        # Reject ambiguous values to preserve evidence integrity.
         if not valid_values.all():
-            raise ValueError(
-                f"Invalid Boolean value in column '{column}'"
-            )
+            raise ValueError(f"Invalid Boolean value in column '{column}'")
 
-    # Return the validated endpoint evidence.
     return devices
 
 
-
-# ============================================================
-# VENDOR EVIDENCE CONFIGURATION
-# ============================================================
-
-# Define the fields required in Northstar BuildCo's
-# third-party vendor evidence.
+# Vendor evidence configuration
+# Required fields for evaluating third-party risk controls.
 REQUIRED_VENDOR_COLUMNS = {
-    'vendor_id',
-    'vendor_name',
-    'service_type',
-    'critical_vendor',
-    'security_review_completed',
-    'review_date',
-    'privileged_access',
-    'mfa_enabled'
+    "vendor_id",
+    "vendor_name",
+    "service_type",
+    "critical_vendor",
+    "security_review_completed",
+    "review_date",
+    "privileged_access",
+    "mfa_enabled",
 }
 
 
+# Vendor evidence loader
 
-# ============================================================
-# VENDOR EVIDENCE LOADER
-# ============================================================
 
 def load_vendor_evidence(filepath):
     """
-    Load vendor evidence from a CSV file.
+    Load and validate third-party vendor evidence from a CSV file.
 
-    Parameters:
+    Args:
         filepath:
-            Path to the vendor evidence CSV file.
+            Path to the vendor-evidence CSV file.
 
     Returns:
-        pandas.DataFrame:
-            Vendor evidence loaded from the CSV file.
+        pd.DataFrame:
+            Validated third-party vendor evidence.
     """
 
-    # Load the vendor evidence into a pandas DataFrame.
     vendors = pd.read_csv(filepath)
 
-    # Identify any required vendor-evidence columns that
-    # are missing from the supplied CSV file.
     missing_columns = REQUIRED_VENDOR_COLUMNS - set(vendors.columns)
 
-    # Reject the evidence if its schema is incomplete.
-    #
-    # This prevents incomplete vendor evidence from entering
-    # the control-assessment pipeline.
+    # Reject incomplete schemas before evaluating vendor controls.
     if missing_columns:
-        raise ValueError(
-            f'Missing required vendor columns: {sorted(missing_columns)}'
-        )
+        raise ValueError(f"Missing required vendor columns: {sorted(missing_columns)}")
 
-    # Define the vendor fields that must contain Boolean values
-    # whenever evidence is present.
-    # 
-    # Blank values are permitted because they represent missing
-    # evidence rather than malformed evidence. The relevant
-    # control assessment will handle missing evidence separately.
+    # Missing Boolean values are handled by the control-assessment layer.
     boolean_columns = [
-        'critical_vendor',
-        'security_review_completed',
-        'privileged_access',
-        'mfa_enabled'
+        "critical_vendor",
+        "security_review_completed",
+        "privileged_access",
+        "mfa_enabled",
     ]
 
-    # Validate each Boolean vendor-evidence field.
     for column in boolean_columns:
-
-        # Remove blank values before ving the remaining data.
-        # 
-        # This preserves the distinction between missing evidence
-        # and invalid evidence.
+        # Exclude missing evidence from Boolean type validation.
         non_null_values = vendors[column].dropna()
 
-        #Check that every non-blank value was interpreted as
-        # a Boolean value by pandas.
-        valid_values = non_null_values.map(
-            lambda value: isinstance(value, bool)
-        )
+        valid_values = non_null_values.map(lambda value: isinstance(value, bool))
 
-        # Reject unsupported values such as 'yes', 'critical'
-        # or 'completed' rather than allowing ambiguous evidence
-        # into the control-assessment engine.
+        # Reject ambiguous values to preserve evidence integrity.
         if not valid_values.all():
-            raise ValueError(
-                f"Invalid Boolean value in column '{column}'"
-            )
+            raise ValueError(f"Invalid Boolean value in column '{column}'")
 
     return vendors

@@ -1,1020 +1,551 @@
+"""Tests for IAM, endpoint, and third-party risk controls."""
+
 import pandas as pd
 
-# Import the control-assessment functions used by these tests.
 from src.controls import (
+    assess_end_01,
+    assess_end_02,
     assess_iam_01,
     assess_iam_02,
     assess_iam_03,
-    assess_end_01,
-    assess_end_02,
     assess_tpr_01,
-    assess_tpr_02
+    assess_tpr_02,
 )
 
+# IAM-01 control tests
 
-# ------------------------------------------------------------------
-# IAM 01 CONTROL TESTING
-# ------------------------------------------------------------------
 
 def test_iam_01_flags_active_users_without_mfa():
-    """
-    Test that IAM-01 identifies active users without MFA
-    as confirmed control exceptions.
-    """
+    """Verify that IAM-01 flags active accounts without MFA."""
+    # Include active accounts with and without MFA, plus a disabled
+    # account that is outside IAM-01's scope.
+    users = pd.DataFrame(
+        [
+            {"username": "jcarter", "enabled": True, "mfa_enabled": True},
+            {"username": "mlopez", "enabled": True, "mfa_enabled": False},
+            {"username": "rsmith", "enabled": False, "mfa_enabled": False},
+            {"username": "snguyen", "enabled": True, "mfa_enabled": False},
+        ]
+    )
 
-    # Create a small sample of user-account evidence.
-    #
-    # The sample deliberately includes:
-    # - an active user with MFA
-    # - two active users without MFA
-    # - a disabled user without MFA
-    #
-    # The disabled user should not be considered an IAM-01 exception
-    # because IAM-01 applies only to active accounts.
-    users = pd.DataFrame([
-        {
-            'username': 'jcarter',
-            'enabled': True,
-            'mfa_enabled': True
-        },
-        {
-            'username': 'mlopez',
-            'enabled': True,
-            'mfa_enabled': False
-        },
-        {
-            'username': 'rsmith',
-            'enabled': False,
-            'mfa_enabled': False
-        },
-        {
-            'username': 'snguyen',
-            'enabled': True,
-            'mfa_enabled': False
-        }
-    ])
-
-    # Run the IAM-01 assessment.
     exceptions, evidence_issues, assessable_population = assess_iam_01(users)
 
-    # Active accounts without MFA should be identified
-    # as confirmed control exceptions.
-    assert set(exceptions['username']) == {
-        'mlopez',
-        'snguyen'
-    }
+    assert set(exceptions["username"]) == {"mlopez", "snguyen"}
 
-    # Every record contains the evidence required for IAM-01,
-    # so there should be no evidence-quality issues.
     assert evidence_issues.empty
 
-    # Only active accounts with known MFA status belong in the
-    # assessable IAM-01 population.
-    assert set(assessable_population['username']) == {
-        'jcarter',
-        'mlopez',
-        'snguyen'
-    }
+    # Only active accounts with known MFA status are assessable.
+    assert set(assessable_population["username"]) == {"jcarter", "mlopez", "snguyen"}
 
 
 def test_iam_01_identifies_missing_account_status():
-    """
-    Test that IAM-01 identifies missing account-status evidence
-    separately from confirmed control exceptions.
-    """
-
+    """Verify that missing account status is reported separately."""
     # jcarter has complete evidence.
     #
     # tgreen has MFA enabled, but the account's enabled status
     # is unknown. Therefore, we cannot determine whether tgreen
     # belongs in IAM-01's active-account population.
-    users = pd.DataFrame([
-        {
-            'username': 'jcarter',
-            'enabled': True,
-            'mfa_enabled': True
-        },
-        {
-            'username': 'tgreen',
-            'enabled': None,
-            'mfa_enabled': True
-        }
-    ])
+    users = pd.DataFrame(
+        [
+            {"username": "jcarter", "enabled": True, "mfa_enabled": True},
+            {"username": "tgreen", "enabled": None, "mfa_enabled": True},
+        ]
+    )
 
-    # Run the IAM-01 assessment.
     exceptions, evidence_issues, assessable_population = assess_iam_01(users)
 
-    # Neither record is a confirmed control exception.
     assert exceptions.empty
 
-    # tgreen should be reported as an evidence-quality issue
-    # because the account's enabled status is unknown.
-    assert set(evidence_issues['username']) == {'tgreen'}
+    # Unknown account status is an evidence issue, not a confirmed exception.
+    assert set(evidence_issues["username"]) == {"tgreen"}
 
-    # Only jcarter has enough evidence to be included in the
-    # assessable IAM-01 population.
-    assert set(assessable_population['username']) == {'jcarter'}
+    # Only jcarter has enough evidence to be assessed.
+    assert set(assessable_population["username"]) == {"jcarter"}
 
 
 def test_iam_01_ignores_missing_mfa_for_disabled_users():
-    """
-    Verify that a disabled account with missing MFA evidence
-    is outside the scope of IAM-01 and is not reported as an
-    evidence-quality issue.
-    """
-    users = pd.DataFrame([
-        {
-            'username': 'disabled_user',
-            'enabled': False,
-            'mfa_enabled': None
-        }
-    ])
-
-    # Assess the test evidence against IAM-01.
-    exceptions, evidence_issues, assessable_population = (
-        assess_iam_01(users)
+    """Verify that disabled accounts are outside IAM-01's scope."""
+    users = pd.DataFrame(
+        [{"username": "disabled_user", "enabled": False, "mfa_enabled": None}]
     )
 
-    # A disabled account is outside the scope of IAM-01.
-    # Therefore, missing MFA evidence should not be treated
-    # as an evidence-quality issue.
+    exceptions, evidence_issues, assessable_population = assess_iam_01(users)
+
     assert evidence_issues.empty
 
-    # The disabled account should not be part of the
-    # assessable IAM-01 population either.
     assert assessable_population.empty
 
-    # It also cannot be a confirmed control exception.
     assert exceptions.empty
 
-# ------------------------------------------------------------------
-# IAM 02 CONTROL TESTING
-# ------------------------------------------------------------------
+
+# IAM-02 control tests
+
 
 def test_iam_02_flags_terminated_users_with_enabled_accounts():
-    """
-    Test that IAM-02 identifies terminated users whose
-    accounts remain enabled.
-    """
+    """Verify that IAM-02 flags enabled accounts belonging to terminated users."""
+    # IAM-02 applies to terminated employees and checks that accounts
+    # are disabled.
+    users = pd.DataFrame(
+        [
+            {"username": "jcarter", "employment_status": "active", "enabled": True},
+            {"username": "mlopez", "employment_status": "active", "enabled": True},
+            {"username": "rsmith", "employment_status": "terminated", "enabled": False},
+            {"username": "etest", "employment_status": "terminated", "enabled": True},
+        ]
+    )
 
-    # Create a small sample containing active and terminated employees.
-    #
-    # IAM-02 applies specifically to terminated employees and tests
-    # whether their user accounts have been disabled.
-    users = pd.DataFrame([
-        {
-            'username': 'jcarter',
-            'employment_status': 'active',
-            'enabled': True
-        },
-        {
-            'username': 'mlopez',
-            'employment_status': 'active',
-            'enabled': True
-        },
-        {
-            'username': 'rsmith',
-            'employment_status': 'terminated',
-            'enabled': False
-        },
-        {
-            'username': 'etest',
-            'employment_status': 'terminated',
-            'enabled': True
-        }
-    ])
-
-    # Run the IAM-02 assessment.
-    #
-    # As with IAM-01, the control returns:
-    # 1. confirmed control exceptions
-    # 2. evidence-quality issues
-    # 3. the assessable control population
     exceptions, evidence_issues, assessable_population = assess_iam_02(users)
 
-    # etest is terminated but still has an enabled account,
-    # making it a confirmed IAM-02 control exception.
-    assert set(exceptions['username']) == {'etest'}
+    assert set(exceptions["username"]) == {"etest"}
 
-    # Every terminated account in this sample contains sufficient
-    # evidence, so there should be no evidence-quality issues.
     assert evidence_issues.empty
 
-    # IAM-02's assessable population consists only of terminated
-    # users whose account status is known.
-    assert set(assessable_population['username']) == {
-        'rsmith',
-        'etest'
-    }
+    # Only terminated users with known account status are assessable.
+    assert set(assessable_population["username"]) == {"rsmith", "etest"}
 
 
 def test_iam_02_identifies_missing_account_status():
-    """
-    Test that IAM-02 identifies missing account-status evidence
-    separately from a confirmed control exception.
-    """
+    """Verify that missing account status is reported separately."""
+    # rsmith is compliant; tgreen's account status is unknown.
+    users = pd.DataFrame(
+        [
+            {"username": "rsmith", "employment_status": "terminated", "enabled": False},
+            {"username": "tgreen", "employment_status": "terminated", "enabled": None},
+        ]
+    )
 
-    # Create two terminated-user records.
-    #
-    # rsmith has sufficient evidence and a properly disabled account.
-    # tgreen is terminated, but the account status is unknown.
-    users = pd.DataFrame([
-        {
-            'username': 'rsmith',
-            'employment_status': 'terminated',
-            'enabled': False
-        },
-        {
-            'username': 'tgreen',
-            'employment_status': 'terminated',
-            'enabled': None
-        }
-    ])
-
-    # Run the IAM-02 assessment.
     exceptions, evidence_issues, assessable_population = assess_iam_02(users)
 
-    # Neither record is a confirmed exception.
-    #
-    # rsmith is compliant, while tgreen lacks enough evidence
-    # to determine whether the account was properly disabled.
     assert exceptions.empty
 
-    # tgreen should be classified as an evidence-quality issue,
-    # not as a control failure.
-    assert set(evidence_issues['username']) == {'tgreen'}
+    # Missing account status is an evidence issue, not a control failure.
+    assert set(evidence_issues["username"]) == {"tgreen"}
 
-    # Only rsmith has sufficient evidence to be included in the
-    # assessable IAM-02 population.
-    assert set(assessable_population['username']) == {'rsmith'}
+    # Only rsmith has sufficient evidence for assessment.
+    assert set(assessable_population["username"]) == {"rsmith"}
 
 
 def test_iam_02_ignores_missing_account_status_for_active_users():
-    """
-    Test that IAM-02 does not report missing account-status evidence
-    for users who are known to be outside the control's scope.
-    """
+    """Verify that active users are outside IAM-02's scope."""
+    # Active users are outside IAM-02's scope, even if account status
+    # is unknown.
+    users = pd.DataFrame(
+        [{"username": "tgreen", "employment_status": "active", "enabled": None}]
+    )
 
-    # This user is active, so IAM-02 does not apply.
-    #
-    # Even though the enabled value is missing, we already have
-    # sufficient evidence to determine that this user is outside
-    # the terminated-user population tested by IAM-02.
-    users = pd.DataFrame([
-        {
-            'username': 'tgreen',
-            'employment_status': 'active',
-            'enabled': None
-        }
-    ])
-
-    # Run the IAM-02 assessment.
     exceptions, evidence_issues, assessable_population = assess_iam_02(users)
 
-    # An active employee cannot be an IAM-02 exception.
     assert exceptions.empty
 
-    # Missing enabled status should not be an IAM-02 evidence issue
-    # because the user is already known to be outside this control's scope.
     assert evidence_issues.empty
 
-    # Active employees are not part of the IAM-02 population.
     assert assessable_population.empty
 
 
-# ------------------------------------------------------------------
-# IAM 03 CONTROL TESTING
-# ------------------------------------------------------------------
+# IAM-03 control tests
+
 
 def test_iam_03_flags_unapproved_admin_accounts():
-    """
-    Test that IAM-03 identifies administrative accounts
-    that do not have documented approval.
-    """
+    """Verify that IAM-03 flags unapproved administrative accounts."""
+    # Include a standard user, an approved administrator, and an
+    # administrator without approval.
+    users = pd.DataFrame(
+        [
+            {"username": "jcarter", "is_admin": False, "admin_approved": False},
+            {"username": "dthomas", "is_admin": True, "admin_approved": True},
+            {"username": "mlopez", "is_admin": True, "admin_approved": False},
+        ]
+    )
 
-    # Create a small sample containing both standard and
-    # administrative user accounts.
-    #
-    # jcarter is a standard user and is outside IAM-03's scope.
-    # dthomas has approved administrative access.
-    # mlopez has administrative access without approval.
-    users = pd.DataFrame([
-        {
-            'username': 'jcarter',
-            'is_admin': False,
-            'admin_approved': False
-        },
-        {
-            'username': 'dthomas',
-            'is_admin': True,
-            'admin_approved': True
-        },
-        {
-            'username': 'mlopez',
-            'is_admin': True,
-            'admin_approved': False
-        }
-    ])
-
-    # Run the IAM-03 assessment.
-    #
-    # As with our other controls, IAM-03 will return:
-    # 1. confirmed control exceptions
-    # 2. evidence-quality issues
-    # 3. the assessable control population
     exceptions, evidence_issues, assessable_population = assess_iam_03(users)
 
-    # mlopez has administrative privileges without documented
-    # approval and therefore represents a confirmed exception.
-    assert set(exceptions['username']) == {'mlopez'}
+    assert set(exceptions["username"]) == {"mlopez"}
 
-    # All administrative accounts have sufficient evidence
-    # to determine whether their privileges were approved.
     assert evidence_issues.empty
 
-    # Only accounts with administrative privileges belong in
-    # IAM-03's assessable population.
-    assert set(assessable_population['username']) == {
-        'dthomas',
-        'mlopez'
-    }
+    # IAM-03 assesses administrative accounts only.
+    assert set(assessable_population["username"]) == {"dthomas", "mlopez"}
 
 
 def test_iam_03_identifies_missing_admin_approval():
-    """
-    Test that IAM-03 identifies missing approval evidence for
-    accounts known to have administrative privileges.
-    """
+    """Verify that missing admin approval is reported as an evidence issue."""
+    # kpatel's administrative approval status is unknown.
+    users = pd.DataFrame(
+        [
+            {"username": "dthomas", "is_admin": True, "admin_approved": True},
+            {"username": "kpatel", "is_admin": True, "admin_approved": None},
+        ]
+    )
 
-    # Create two administrative accounts.
-    #
-    # dthomas has documented approval for administrative access.
-    # kpatel is an administrator, but the approval status is missing.
-    users = pd.DataFrame([
-        {
-            'username': 'dthomas',
-            'is_admin': True,
-            'admin_approved': True
-        },
-        {
-            'username': 'kpatel',
-            'is_admin': True,
-            'admin_approved': None
-        }
-    ])
-
-    # Run the IAM-03 assessment.
     exceptions, evidence_issues, assessable_population = assess_iam_03(users)
 
-    # Neither account is a confirmed control exception.
-    #
-    # dthomas is compliant, while kpatel cannot be evaluated because
-    # the required approval evidence is missing.
     assert exceptions.empty
 
-    # kpatel should be classified as an evidence-quality issue,
-    # not as a confirmed control failure.
-    assert set(evidence_issues['username']) == {'kpatel'}
+    # Missing approval evidence is an evidence issue, not a control failure.
+    assert set(evidence_issues["username"]) == {"kpatel"}
 
-    # Only dthomas has sufficient evidence to be included in the
-    # assessable IAM-03 population.
-    assert set(assessable_population['username']) == {'dthomas'}
+    # Only dthomas has sufficient evidence for assessment.
+    assert set(assessable_population["username"]) == {"dthomas"}
 
 
 def test_iam_03_ignores_missing_approval_for_non_admin_accounts():
-    """
-    Test that IAM-03 does not report missing approval evidence
-    for accounts known not to have administrative privileges.
-    """
+    """Verify that non-admin accounts are outside IAM-03's scope."""
+    # IAM-03 does not apply to a known non-admin account.
+    users = pd.DataFrame(
+        [{"username": "jcarter", "is_admin": False, "admin_approved": None}]
+    )
 
-    # This account is known to be a standard, non-admin account.
-    #
-    # Because is_admin is False, IAM-03 does not apply.
-    # Therefore, a missing admin_approved value should not be
-    # treated as an IAM-03 evidence-quality issue.
-    users = pd.DataFrame([
-        {
-            'username': 'jcarter',
-            'is_admin': False,
-            'admin_approved': None
-        }
-    ])
-
-    # Run the IAM-03 assessment.
     exceptions, evidence_issues, assessable_population = assess_iam_03(users)
 
-    # A non-admin account cannot violate IAM-03.
     assert exceptions.empty
 
-    # Missing approval evidence does not matter for a user who
-    # is already known to be outside IAM-03's scope.
     assert evidence_issues.empty
 
-    # Non-admin accounts are not part of the IAM-03
-    # assessable population.
     assert assessable_population.empty
 
 
-# ------------------------------------------------------------------
-# END 01 CONTROL TESTING
-# ------------------------------------------------------------------
+# END-01 control tests
+
 
 def test_end_01_flags_unencrypted_company_managed_devices():
-    """
-    Test that END-01 identifies company-managed devices
-    that do not use disk encryption.
-    """
-
-    # Create a small sample containing both company-managed
-    # and personally owned devices.
-    #
-    # DEV-001 is managed and encrypted.
-    # DEV-002 is managed but not encrypted.
-    # DEV-003 is not company-managed and is therefore outside
-    # the scope of END-01.
-    devices = pd.DataFrame([
-        {
-            'device_id': 'DEV-001',
-            'company_managed': True,
-            'disk_encrypted': True
-        },
-        {
-            'device_id': 'DEV-002',
-            'company_managed': True,
-            'disk_encrypted': False
-        },
-        {
-            'device_id': 'DEV-003',
-            'company_managed': False,
-            'disk_encrypted': False
-        }
-    ])
-
-    # Run the END-01 assessment.
-    #
-    # END-01 follows the same assessment pattern as our IAM controls:
-    # 1. confirmed control exceptions
-    # 2. evidence-quality issues
-    # 3. assessable control population
-    exceptions, evidence_issues, assessable_population = assess_end_01(
-        devices
+    """Verify that END-01 flags unencrypted managed devices."""
+    # Include managed encrypted and unencrypted devices, plus an
+    # unmanaged device outside END-01's scope.
+    devices = pd.DataFrame(
+        [
+            {"device_id": "DEV-001", "company_managed": True, "disk_encrypted": True},
+            {"device_id": "DEV-002", "company_managed": True, "disk_encrypted": False},
+            {"device_id": "DEV-003", "company_managed": False, "disk_encrypted": False},
+        ]
     )
 
-    # DEV-002 is company-managed but unencrypted, making it
-    # a confirmed END-01 control exception.
-    assert set(exceptions['device_id']) == {'DEV-002'}
+    exceptions, evidence_issues, assessable_population = assess_end_01(devices)
 
-    # All records contain sufficient evidence to determine
-    # their END-01 scope and compliance status.
+    assert set(exceptions["device_id"]) == {"DEV-002"}
+
     assert evidence_issues.empty
 
-    # Only company-managed devices with known encryption status
-    # belong in the assessable END-01 population.
-    assert set(assessable_population['device_id']) == {
-        'DEV-001',
-        'DEV-002'
-    }
+    # Only managed devices with known encryption status are assessable.
+    assert set(assessable_population["device_id"]) == {"DEV-001", "DEV-002"}
 
 
 def test_end_01_identifies_missing_encryption_status():
-    """
-    Test that END-01 identifies missing disk-encryption evidence
-    for company-managed devices.
-    """
-
-    # Create two company-managed endpoint records.
-    #
-    # DEV-001 has sufficient evidence and is encrypted.
-    # DEV-007 is company-managed, but its encryption status
-    # is unknown.
-    devices = pd.DataFrame([
-        {
-            'device_id': 'DEV-001',
-            'company_managed': True,
-            'disk_encrypted': True
-        },
-        {
-            'device_id': 'DEV-007',
-            'company_managed': True,
-            'disk_encrypted': None
-        }
-    ])
-
-    # Run the END-01 assessment.
-    exceptions, evidence_issues, assessable_population = assess_end_01(
-        devices
+    """Verify that missing encryption status is reported as an evidence issue."""
+    # DEV-007 is managed, but its encryption status is unknown.
+    devices = pd.DataFrame(
+        [
+            {"device_id": "DEV-001", "company_managed": True, "disk_encrypted": True},
+            {"device_id": "DEV-007", "company_managed": True, "disk_encrypted": None},
+        ]
     )
 
-    # Neither device is a confirmed control exception.
-    #
-    # DEV-001 is compliant, while DEV-007 cannot be evaluated
-    # because its disk-encryption evidence is missing.
+    exceptions, evidence_issues, assessable_population = assess_end_01(devices)
+
     assert exceptions.empty
 
-    # DEV-007 should be classified as an evidence-quality issue,
-    # not as a confirmed control failure.
-    assert set(evidence_issues['device_id']) == {'DEV-007'}
+    # Missing encryption status is an evidence issue, not a control failure.
+    assert set(evidence_issues["device_id"]) == {"DEV-007"}
 
-    # Only DEV-001 has sufficient evidence to be included in
-    # the assessable END-01 population.
-    assert set(assessable_population['device_id']) == {'DEV-001'}
+    assert set(assessable_population["device_id"]) == {"DEV-001"}
 
 
 def test_end_01_ignores_missing_encryption_for_unmanaged_devices():
-    """
-    Test that END-01 does not report missing encryption evidence
-    for devices known to be outside the control's scope.
-    """
-
-    # This device is not company-managed, so END-01 does not apply.
-    #
-    # Even though disk_encrypted is missing, we already have
-    # sufficient evidence to determine that the device is outside
-    # the company-managed endpoint population.
-    devices = pd.DataFrame([
-        {
-            'device_id': 'PERSONAL-LT-01',
-            'company_managed': False,
-            'disk_encrypted': None
-        }
-    ])
-
-    # Run the END-01 assessment.
-    exceptions, evidence_issues, assessable_population = assess_end_01(
-        devices
+    """Verify that unmanaged devices are outside END-01's scope."""
+    # Unmanaged devices are outside END-01's scope despite missing
+    # encryption status.
+    devices = pd.DataFrame(
+        [
+            {
+                "device_id": "PERSONAL-LT-01",
+                "company_managed": False,
+                "disk_encrypted": None,
+            }
+        ]
     )
 
-    # An unmanaged device cannot be an END-01 control exception.
+    exceptions, evidence_issues, assessable_population = assess_end_01(devices)
+
     assert exceptions.empty
 
-    # Missing encryption evidence does not matter for a device
-    # already known to be outside END-01's scope.
     assert evidence_issues.empty
 
-    # Unmanaged devices are not part of the END-01
-    # assessable population.
     assert assessable_population.empty
 
 
-# ------------------------------------------------------------------
-# END 02 CONTROL TESTING
-# ------------------------------------------------------------------
+# END-02 control tests
+
 
 def test_end_02_flags_unprotected_company_managed_devices():
-    """
-    Test that END-02 identifies company-managed devices
-    that do not have endpoint protection enabled.
-    """
-
-    # Create a small endpoint population containing both
-    # company-managed and personally owned devices.
-    #
-    # DEV-001 is managed and protected.
-    # DEV-002 is managed but not protected.
-    # PERSONAL-LT-01 is unmanaged and therefore outside
-    # the scope of END-02.
-    devices = pd.DataFrame([
-        {
-            'device_id': 'DEV-001',
-            'company_managed': True,
-            'endpoint_protection': True
-        },
-        {
-            'device_id': 'DEV-002',
-            'company_managed': True,
-            'endpoint_protection': False
-        },
-        {
-            'device_id': 'PERSONAL-LT-01',
-            'company_managed': False,
-            'endpoint_protection': False
-        }
-    ])
-
-    # Run the END-02 assessment.
-    exceptions, evidence_issues, assessable_population = assess_end_02(
-        devices
+    """Verify that END-02 flags managed devices without endpoint protection."""
+    # Include managed protected and unprotected devices, plus an
+    # unmanaged device outside END-02's scope.
+    devices = pd.DataFrame(
+        [
+            {
+                "device_id": "DEV-001",
+                "company_managed": True,
+                "endpoint_protection": True,
+            },
+            {
+                "device_id": "DEV-002",
+                "company_managed": True,
+                "endpoint_protection": False,
+            },
+            {
+                "device_id": "PERSONAL-LT-01",
+                "company_managed": False,
+                "endpoint_protection": False,
+            },
+        ]
     )
 
-    # DEV-002 is a confirmed exception because it is
-    # company-managed but lacks endpoint protection.
-    assert set(exceptions['device_id']) == {'DEV-002'}
+    exceptions, evidence_issues, assessable_population = assess_end_02(devices)
 
-    # Every record contains enough evidence to determine
-    # whether END-02 applies and whether the device complies.
+    assert set(exceptions["device_id"]) == {"DEV-002"}
+
     assert evidence_issues.empty
 
-    # Only company-managed devices with known protection status
-    # belong in the assessable population.
-    assert set(assessable_population['device_id']) == {
-        'DEV-001',
-        'DEV-002'
-    }
+    # Only managed devices with known protection status are assessable.
+    assert set(assessable_population["device_id"]) == {"DEV-001", "DEV-002"}
 
 
 def test_end_02_identifies_missing_endpoint_protection_status():
-    """
-    Test that END-02 identifies missing endpoint-protection evidence
-    for company-managed devices.
-    """
-
-    # Create two company-managed endpoint records.
-    #
-    # DEV-001 has endpoint protection enabled and is compliant.
-    # DEV-007 is company-managed, but its endpoint-protection
-    # status is unknown.
-    devices = pd.DataFrame([
-        {
-            'device_id': 'DEV-001',
-            'company_managed': True,
-            'endpoint_protection': True
-        },
-        {
-            'device_id': 'DEV-007',
-            'company_managed': True,
-            'endpoint_protection': None
-        }
-    ])
-
-    # Run the END-02 assessment.
-    exceptions, evidence_issues, assessable_population = assess_end_02(
-        devices
+    """Verify that missing endpoint-protection status is an evidence issue."""
+    # DEV-007 is managed, but its endpoint-protection status is unknown.
+    devices = pd.DataFrame(
+        [
+            {
+                "device_id": "DEV-001",
+                "company_managed": True,
+                "endpoint_protection": True,
+            },
+            {
+                "device_id": "DEV-007",
+                "company_managed": True,
+                "endpoint_protection": None,
+            },
+        ]
     )
 
-    # Neither device is a confirmed control exception.
-    #
-    # DEV-001 is compliant, while DEV-007 cannot be evaluated
-    # because its endpoint-protection evidence is missing.
+    exceptions, evidence_issues, assessable_population = assess_end_02(devices)
+
     assert exceptions.empty
 
-    # DEV-007 should be classified as an evidence-quality issue,
-    # not as a confirmed END-02 failure.
-    assert set(evidence_issues['device_id']) == {'DEV-007'}
+    # Missing protection status is an evidence issue, not a control failure.
+    assert set(evidence_issues["device_id"]) == {"DEV-007"}
 
-    # Only DEV-001 has sufficient evidence to be included
-    # in the assessable END-02 population.
-    assert set(assessable_population['device_id']) == {'DEV-001'}
+    assert set(assessable_population["device_id"]) == {"DEV-001"}
 
 
 def test_end_02_ignores_missing_protection_for_unmanaged_devices():
-    """
-    Test that END-02 does not report missing endpoint-protection
-    evidence for devices known to be outside the control's scope.
-    """
-
-    # This device is not company-managed, so END-02 does not apply.
-    #
-    # Even though endpoint_protection is missing, we already know
-    # enough to determine that the device is outside the control's
-    # assessment population.
-    devices = pd.DataFrame([
-        {
-            'device_id': 'PERSONAL-LT-01',
-            'company_managed': False,
-            'endpoint_protection': None
-        }
-    ])
-
-    # Run the END-02 assessment.
-    exceptions, evidence_issues, assessable_population = assess_end_02(
-        devices
+    """Verify that unmanaged devices are outside END-02's scope."""
+    # Unmanaged devices are outside END-02's scope despite missing
+    # protection status.
+    devices = pd.DataFrame(
+        [
+            {
+                "device_id": "PERSONAL-LT-01",
+                "company_managed": False,
+                "endpoint_protection": None,
+            }
+        ]
     )
 
-    # An unmanaged device cannot be an END-02 control exception.
+    exceptions, evidence_issues, assessable_population = assess_end_02(devices)
+
     assert exceptions.empty
 
-    # Missing endpoint-protection evidence does not matter when
-    # the device is already known to be outside END-02's scope.
     assert evidence_issues.empty
 
-    # Unmanaged devices are excluded from the assessable population.
     assert assessable_population.empty
 
 
+# TPR-01 control tests
 
-# ------------------------------------------------------------------
-# TPR 01 CONTROL TESTING
-# ------------------------------------------------------------------
 
 def test_tpr_01_flags_critical_vendors_without_security_review():
-    """
-    Test that TPR-01 identifies critical third-party vendors
-    that do not have a documented security review.
-    """
-
-    # Create a small vendor population containing both critical
-    # and noncritical third-party vendors.
-    #
-    # VND-001 is critical and has completed a security review.
-    # VND-002 is critical but has not completed a security review.
-    # VND-003 is noncritical and therefore outside TPR-01's scope.
-    vendors = pd.DataFrame([
-        {
-            'vendor_id': 'VND-001',
-            'critical_vendor': True,
-            'security_review_completed': True
-        },
-        {
-            'vendor_id': 'VND-002',
-            'critical_vendor': True,
-            'security_review_completed': False
-        },
-        {
-            'vendor_id': 'VND-003',
-            'critical_vendor': False,
-            'security_review_completed': False
-        }
-    ])
-
-    # Run the TPR-01 assessment.
-    #
-    # TPR-01 follows the same assessment pattern as the IAM
-    # and endpoint controls:
-    # 1. confirmed control exceptions
-    # 2. evidence-quality issues
-    # 3. assessable control population
-    exceptions, evidence_issues, assessable_population = assess_tpr_01(
-        vendors
+    """Verify that TPR-01 flags critical vendors without a security review."""
+    # Include reviewed and unreviewed critical vendors, plus a
+    # noncritical vendor outside TPR-01's scope.
+    vendors = pd.DataFrame(
+        [
+            {
+                "vendor_id": "VND-001",
+                "critical_vendor": True,
+                "security_review_completed": True,
+            },
+            {
+                "vendor_id": "VND-002",
+                "critical_vendor": True,
+                "security_review_completed": False,
+            },
+            {
+                "vendor_id": "VND-003",
+                "critical_vendor": False,
+                "security_review_completed": False,
+            },
+        ]
     )
 
-    # VND-002 is critical but lacks a completed security review,
-    # making it a confirmed TPR-01 control exception.
-    assert set(exceptions['vendor_id']) == {'VND-002'}
+    exceptions, evidence_issues, assessable_population = assess_tpr_01(vendors)
 
-    # Every record contains sufficient evidence to determine
-    # whether TPR-01 applies and whether the vendor complies.
+    assert set(exceptions["vendor_id"]) == {"VND-002"}
+
     assert evidence_issues.empty
 
-    # Only critical vendors with known security-review status
-    # belong in TPR-01's assessable population.
-    assert set(assessable_population['vendor_id']) == {
-        'VND-001',
-        'VND-002'
-    }
+    # Only critical vendors with known review status are assessable.
+    assert set(assessable_population["vendor_id"]) == {"VND-001", "VND-002"}
 
 
 def test_tpr_01_identifies_missing_security_review_status():
-    """
-    Test that TPR-01 identifies missing security-review evidence
-    for vendors known to be critical.
-    """
-
-    # Create two critical third-party vendor records.
-    #
-    # VND-001 has a completed security review.
-    # VND-004 is critical, but its security-review status
-    # is unknown.
-    vendors = pd.DataFrame([
-        {
-            'vendor_id': 'VND-001',
-            'critical_vendor': True,
-            'security_review_completed': True
-        },
-        {
-            'vendor_id': 'VND-004',
-            'critical_vendor': True,
-            'security_review_completed': None
-        }
-    ])
-
-    # Run the TPR-01 assessment.
-    exceptions, evidence_issues, assessable_population = assess_tpr_01(
-        vendors
+    """Verify that missing security-review status is an evidence issue."""
+    # VND-004 is critical, but its security-review status is unknown.
+    vendors = pd.DataFrame(
+        [
+            {
+                "vendor_id": "VND-001",
+                "critical_vendor": True,
+                "security_review_completed": True,
+            },
+            {
+                "vendor_id": "VND-004",
+                "critical_vendor": True,
+                "security_review_completed": None,
+            },
+        ]
     )
 
-    # Neither vendor is a confirmed control exception.
-    #
-    # VND-001 is compliant, while VND-004 cannot be evaluated
-    # because its security-review evidence is missing.
+    exceptions, evidence_issues, assessable_population = assess_tpr_01(vendors)
+
     assert exceptions.empty
 
-    # VND-004 should be classified as an evidence-quality issue,
-    # not as a confirmed control failure.
-    assert set(evidence_issues['vendor_id']) == {'VND-004'}
+    # Missing review status is an evidence issue, not a control failure.
+    assert set(evidence_issues["vendor_id"]) == {"VND-004"}
 
-    # Only VND-001 has sufficient evidence to be included in
-    # TPR-01's assessable population.
-    assert set(assessable_population['vendor_id']) == {'VND-001'}
+    assert set(assessable_population["vendor_id"]) == {"VND-001"}
 
 
 def test_tpr_01_ignores_missing_review_for_noncritical_vendors():
-    """
-    Test that TPR-01 does not report missing security-review
-    evidence for vendors known to be outside the control's scope.
-    """
-
-    # This vendor is not classified as critical, so TPR-01
-    # does not apply.
-    #
-    # Even though security_review_completed is missing, we
-    # already have sufficient evidence to determine that the
-    # vendor is outside the critical-vendor population.
-    vendors = pd.DataFrame([
-        {
-            'vendor_id': 'VND-007',
-            'critical_vendor': False,
-            'security_review_completed': None
-        }
-    ])
-
-    # Run the TPR-01 assessment.
-    exceptions, evidence_issues, assessable_population = assess_tpr_01(
-        vendors
+    """Verify that noncritical vendors are outside TPR-01's scope."""
+    # Noncritical vendors are outside TPR-01's scope even if review
+    # status is missing.
+    vendors = pd.DataFrame(
+        [
+            {
+                "vendor_id": "VND-007",
+                "critical_vendor": False,
+                "security_review_completed": None,
+            }
+        ]
     )
 
-    # A noncritical vendor cannot be a TPR-01 control exception.
+    exceptions, evidence_issues, assessable_population = assess_tpr_01(vendors)
+
     assert exceptions.empty
 
-    # Missing security-review evidence does not matter when
-    # the vendor is already known to be outside TPR-01's scope.
     assert evidence_issues.empty
 
-    # Noncritical vendors are excluded from the assessable
-    # TPR-01 population.
     assert assessable_population.empty
 
 
 def test_tpr_01_identifies_missing_critical_vendor_status():
-    """
-    Test that TPR-01 identifies missing critical-vendor
-    classification as an evidence-quality issue.
-    """
-
-    # Create two vendor records.
-    #
-    # VND-001 is known to be critical and has completed
-    # a security review.
-    #
-    # VND-008 has a known security-review status, but its
-    # critical-vendor classification is missing. Without that
-    # classification, we cannot determine whether TPR-01 applies.
-    vendors = pd.DataFrame([
-        {
-            'vendor_id': 'VND-001',
-            'critical_vendor': True,
-            'security_review_completed': True
-        },
-        {
-            'vendor_id': 'VND-008',
-            'critical_vendor': None,
-            'security_review_completed': True
-        }
-    ])
-
-    # Run the TPR-01 assessment.
-    exceptions, evidence_issues, assessable_population = assess_tpr_01(
-        vendors
+    """Verify that missing critical-vendor status is an evidence issue."""
+    # VND-008's missing critical-vendor classification prevents
+    # determining whether TPR-01 applies.
+    vendors = pd.DataFrame(
+        [
+            {
+                "vendor_id": "VND-001",
+                "critical_vendor": True,
+                "security_review_completed": True,
+            },
+            {
+                "vendor_id": "VND-008",
+                "critical_vendor": None,
+                "security_review_completed": True,
+            },
+        ]
     )
 
-    # Neither vendor is a confirmed control exception.
+    exceptions, evidence_issues, assessable_population = assess_tpr_01(vendors)
+
     assert exceptions.empty
 
-    # VND-008 should be classified as an evidence-quality issue
-    # because its critical-vendor status is unknown.
-    assert set(evidence_issues['vendor_id']) == {'VND-008'}
+    assert set(evidence_issues["vendor_id"]) == {"VND-008"}
 
-    # Only VND-001 has sufficient evidence to determine both
-    # control scope and compliance.
-    assert set(assessable_population['vendor_id']) == {'VND-001'}
+    # Only VND-001 has evidence for both scope and compliance.
+    assert set(assessable_population["vendor_id"]) == {"VND-001"}
 
 
+# TPR-02 control tests
 
-# ------------------------------------------------------------------
-# TPR 02 CONTROL TESTING
-# ------------------------------------------------------------------
 
 def test_tpr_02_flags_privileged_vendors_without_mfa():
-    """
-    Test that vendors with privileged access are flagged when
-    MFA is explicitly disabled.
-    """
+    """Verify that TPR-02 flags privileged vendors without MFA."""
+    # Include vendors with and without privileged access and MFA.
+    vendors = pd.DataFrame(
+        [
+            {"vendor_id": "VND-001", "privileged_access": True, "mfa_enabled": True},
+            {"vendor_id": "VND-002", "privileged_access": True, "mfa_enabled": False},
+            {"vendor_id": "VND-003", "privileged_access": False, "mfa_enabled": False},
+        ]
+    )
 
-    # Create representative vendor evidence.
-    #
-    # VND-001 has privileged access and MFA enabled, so it is compliant.
-    # VND-002 has privileged access and MFA disabled, so it is an exception.
-    # VND-003 does not have privileged access, so it is outside TPR-02 scope.
-    vendors = pd.DataFrame([
-        {
-            'vendor_id': 'VND-001',
-            'privileged_access': True,
-            'mfa_enabled': True
-        },
-        {
-            'vendor_id': 'VND-002',
-            'privileged_access': True,
-            'mfa_enabled': False
-        },
-        {
-            'vendor_id': 'VND-003',
-            'privileged_access': False,
-            'mfa_enabled': False
-        }
-    ])
-
-    # Assess the vendor evidence against TPR-02.
     exceptions, evidence_issues, assessable_population = assess_tpr_02(vendors)
 
-    # VND-002 is the only confirmed control exception.
-    assert list(exceptions['vendor_id']) == ['VND-002']
+    assert list(exceptions["vendor_id"]) == ["VND-002"]
 
-    # All evidence needed for the in-scope vendors is present.
     assert evidence_issues.empty
 
-    # Only privileged vendors belong in the assessable population.
-    assert list(assessable_population['vendor_id']) == [
-        'VND-001',
-        'VND-002'
-    ]
+    # TPR-02 assesses privileged vendors only.
+    assert list(assessable_population["vendor_id"]) == ["VND-001", "VND-002"]
 
 
 def test_tpr_02_identifies_missing_mfa_status():
-    """
-    Test that a privileged vendor with missing MFA evidence
-    is identified as an evidence-quality issue.
-    """
+    """Verify that missing MFA status is an evidence issue for in-scope vendors."""
+    # The vendor is in scope, but missing MFA status prevents assessment.
+    vendors = pd.DataFrame(
+        [{"vendor_id": "VND-001", "privileged_access": True, "mfa_enabled": None}]
+    )
 
-    # The vendor is known to have privileged access, but its
-    # MFA status is unknown. Therefore, we cannot determine
-    # whether the vendor complies with TPR-02.
-    vendors = pd.DataFrame([
-        {
-            'vendor_id': 'VND-001',
-            'privileged_access': True,
-            'mfa_enabled': None
-        }
-    ])
-
-    # Assess the vendor evidence against TPR-02.
     exceptions, evidence_issues, assessable_population = assess_tpr_02(vendors)
 
-    # Missing MFA evidence is not a confirmed control failure.
     assert exceptions.empty
 
-    # The vendor should be reported as an evidence-quality issue.
-    assert list(evidence_issues['vendor_id']) == ['VND-001']
+    # Missing MFA status is an evidence issue, not a control failure.
+    assert list(evidence_issues["vendor_id"]) == ["VND-001"]
 
-    # Without MFA evidence, the vendor cannot enter the
-    # assessable population.
     assert assessable_population.empty
 
 
 def test_tpr_02_ignores_missing_mfa_for_nonprivileged_vendors():
-    """
-    Test that missing MFA evidence is not an evidence issue
-    when the vendor does not have privileged access.
-    """
+    """Verify that nonprivileged vendors are outside TPR-02's scope."""
+    # A known non-privileged vendor is outside TPR-02's scope even if
+    # its MFA status is missing.
+    vendors = pd.DataFrame(
+        [{"vendor_id": "VND-001", "privileged_access": False, "mfa_enabled": None}]
+    )
 
-    # TPR-02 applies only to vendors with privileged access.
-    #
-    # Because this vendor is explicitly non-privileged, its
-    # missing MFA status does not prevent us from determining
-    # the control's applicability.
-    vendors = pd.DataFrame([
-        {
-            'vendor_id': 'VND-001',
-            'privileged_access': False,
-            'mfa_enabled': None
-        }
-    ])
-
-    # Assess the vendor evidence against TPR-02.
     exceptions, evidence_issues, assessable_population = assess_tpr_02(vendors)
 
-    # The vendor is outside the control's scope.
     assert exceptions.empty
     assert evidence_issues.empty
     assert assessable_population.empty
 
 
 def test_tpr_02_identifies_missing_privileged_access_status():
-    """
-    Test that missing privileged-access evidence is identified
-    as an evidence-quality issue.
-    """
+    """Verify that missing privileged-access status is an evidence issue."""
+    # MFA status does not resolve missing evidence about whether the
+    # vendor is in scope.
+    vendors = pd.DataFrame(
+        [{"vendor_id": "VND-001", "privileged_access": None, "mfa_enabled": True}]
+    )
 
-    # Without privileged_access evidence, we cannot determine
-    # whether the vendor belongs in TPR-02's scope.
-    #
-    # Even though MFA is enabled, that does not resolve the
-    # missing scope evidence.
-    vendors = pd.DataFrame([
-        {
-            'vendor_id': 'VND-001',
-            'privileged_access': None,
-            'mfa_enabled': True
-        }
-    ])
-
-    # Assess the vendor evidence against TPR-02.
     exceptions, evidence_issues, assessable_population = assess_tpr_02(vendors)
 
-    # The missing scope evidence is not a confirmed failure.
     assert exceptions.empty
 
-    # The vendor should be identified as an evidence-quality issue.
-    assert list(evidence_issues['vendor_id']) == ['VND-001']
+    assert list(evidence_issues["vendor_id"]) == ["VND-001"]
 
-    # We cannot include the vendor in the assessable population
-    # until its privileged-access status is known.
+    # The vendor is not assessable until privileged-access status is known.
     assert assessable_population.empty
