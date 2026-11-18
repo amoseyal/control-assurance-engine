@@ -41,7 +41,9 @@ def test_assessment_workspace_handles_empty_repository(monkeypatch):
     assert not app.exception
     assert len(app.info) == 1
     assert app.info[0].value == "No saved assessments are available."
-    assert len(app.selectbox) == 0
+    assert not any(
+        selectbox.label == "Select an assessment" for selectbox in app.selectbox
+    )
 
 
 def test_assessment_workspace_displays_assessment(monkeypatch):
@@ -83,10 +85,24 @@ def test_assessment_workspace_displays_assessment(monkeypatch):
     app.run()
 
     assert not app.exception
-    assert app.selectbox[0].value == summary
+
+    assessment_selector = next(
+        selectbox
+        for selectbox in app.selectbox
+        if selectbox.label == "Select an assessment"
+    )
+
+    assert assessment_selector.value == summary
     assert any(header.value == "Example Security Corp" for header in app.header)
     assert len(app.metric) == 3
     assert [metric.value for metric in app.metric] == ["0", "0", "0"]
+
+    assert any("Assessment not yet evaluated" in message.value for message in app.info)
+
+    assert not any(
+        "No security findings were identified" in message.value
+        for message in app.success
+    )
 
 
 def test_assessment_workspace_displays_security_finding(monkeypatch):
@@ -149,7 +165,14 @@ def test_assessment_workspace_displays_security_finding(monkeypatch):
     app.run()
 
     assert not app.exception
-    assert app.selectbox[0].value == summary
+
+    assessment_selector = next(
+        selectbox
+        for selectbox in app.selectbox
+        if selectbox.label == "Select an assessment"
+    )
+
+    assert assessment_selector.value == summary
 
     assert [metric.value for metric in app.metric] == ["1", "1", "1"]
 
@@ -163,3 +186,157 @@ def test_assessment_workspace_displays_security_finding(monkeypatch):
 
     assert len(app.expander) == 1
     assert "FND-TEST-001" in app.expander[0].label
+
+
+def test_assessment_workspace_creates_assessment(monkeypatch, tmp_path):
+    """Verify that submitting the form saves a new assessment record."""
+
+    # Isolate assessment storage from production data.
+    storage_directory = tmp_path / "assessments"
+    storage_directory.mkdir()
+
+    monkeypatch.setattr(
+        "src.assessment_service.get_assessments_directory",
+        lambda: storage_directory,
+    )
+
+    monkeypatch.setattr(
+        "src.assessment_workspace.get_assessment_summaries",
+        list,
+    )
+
+    # Initialize the Streamlit application.
+    app = AppTest.from_file(APP_PATH, default_timeout=10)
+    app.run()
+
+    assert not app.exception
+
+    # Populate the assessment creation form.
+    app.text_input("assessment_id").set_value("ASM-TEST-003")
+    app.text_input[1].set_value("Example Security Corp")
+    app.text_input[2].set_value("Test Assessor")
+    app.text_area[0].set_value("Identity and Access Management")
+
+    # Submit the form.
+    app.button[0].click().run()
+
+    assert not app.exception
+
+    # Verify that the assessment was saved.
+    saved_path = storage_directory / "ASM-TEST-003.json"
+
+    assert saved_path.is_file()
+    assert any("created successfully" in message.value for message in app.success)
+
+
+def test_assessment_workspace_rejects_duplicate_id(monkeypatch, tmp_path):
+    """Verify that duplicate IDs cannot overwrite existing assessments."""
+
+    storage_directory = tmp_path / "assessments"
+    storage_directory.mkdir()
+
+    monkeypatch.setattr(
+        "src.assessment_service.get_assessments_directory",
+        lambda: storage_directory,
+    )
+
+    monkeypatch.setattr(
+        "src.assessment_workspace.get_assessment_summaries",
+        list,
+    )
+
+    app = AppTest.from_file(APP_PATH, default_timeout=10)
+    app.run()
+
+    assert not app.exception
+
+    # Create the original assessment.
+    app.text_input("assessment_id").set_value("ASM-TEST-004")
+    app.text_input[1].set_value("Original Organization")
+    app.text_input[2].set_value("Test Assessor")
+    app.text_area[0].set_value("Identity and Access Management")
+
+    app.button[0].click().run()
+
+    assert not app.exception
+
+    saved_path = storage_directory / "ASM-TEST-004.json"
+    assert saved_path.is_file()
+
+    original_contents = saved_path.read_bytes()
+
+    # Attempt to create another assessment using the same identifier.
+    app.text_input[1].set_value("Different Organization")
+    app.button[0].click().run()
+
+    assert not app.exception
+
+    # Verify that the interface reports the duplicate identifier.
+    assert any("already exists" in message.value for message in app.error)
+
+    # Verify that the original assessment remains unchanged.
+    assert saved_path.read_bytes() == original_contents
+
+
+def test_assessment_workspace_rejects_blank_metadata(monkeypatch, tmp_path):
+    """Verify that blank required metadata cannot create an assessment."""
+
+    storage_directory = tmp_path / "assessments"
+    storage_directory.mkdir()
+
+    monkeypatch.setattr(
+        "src.assessment_service.get_assessments_directory",
+        lambda: storage_directory,
+    )
+
+    monkeypatch.setattr(
+        "src.assessment_workspace.get_assessment_summaries",
+        list,
+    )
+
+    app = AppTest.from_file(APP_PATH, default_timeout=10)
+    app.run()
+
+    assert not app.exception
+
+    # Provide an identifier but leave required metadata blank.
+    app.text_input("assessment_id").set_value("ASM-TEST-005")
+
+    # Submit the incomplete assessment.
+    app.button[0].click().run()
+
+    assert not app.exception
+
+    # Verify that the application displays a validation error.
+    assert any("Invalid assessment details" in message.value for message in app.error)
+
+    # Verify that no assessment record was created.
+    assert list(storage_directory.iterdir()) == []
+
+
+def test_assessment_workspace_reviews_new_assessment(monkeypatch, tmp_path):
+    """Verify that a newly created assessment appears in the workspace."""
+
+    storage_directory = tmp_path / "assessments"
+    storage_directory.mkdir()
+
+    monkeypatch.setattr(
+        "src.assessment_service.get_assessments_directory",
+        lambda: storage_directory,
+    )
+
+    app = AppTest.from_file(APP_PATH, default_timeout=10)
+    app.run()
+
+    assert not app.exception
+
+    # Create an assessment through the Streamlit form.
+    app.text_input("assessment_id").set_value("ASM-TEST-006")
+    app.text_input[1].set_value("Example Security Corp")
+    app.text_input[2].set_value("Test Assessor")
+    app.text_area[0].set_value("Identity and Access Management")
+
+    app.button[0].click().run()
+
+    assert not app.exception
+    assert (storage_directory / "ASM-TEST-006.json").is_file()
